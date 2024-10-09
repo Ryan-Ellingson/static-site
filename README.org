@@ -1,1 +1,50 @@
 #+title: Static Site
+
+
+* Build and Run The Site Locally
+I like to have a local Nginx server that I can check the site against so there are no surprises when I deploy things. Also a good sanity check for any server configuration changes that need to be tested.
+** Prerequisite
+- Clojure CLJ Tool
+- Docker
+** Start the Nginx Container
+#+begin_src shell :results verbatim
+docker run --name static-site-custom -p 80:80 -d  -v "$(pwd)/target:/var/www/html:ro"  -v "$(pwd)/default.conf:/etc/nginx/conf.d/default.conf:ro" nginx
+#+end_src
+
+#+RESULTS:
+
+
+Alternatively, if the container already exists, just start it.
+#+begin_src sh
+docker start static-site-custom
+#+end_src
+
+#+RESULTS:
+: static-site-custom
+
+** Build
+#+begin_src shell :results verbatim
+clj -T:build build-site
+#+end_src
+
+** Teardown
+*** Stop the Server Container
+#+begin_src shell :results verbatim
+docker stop static-site-custom
+#+end_src
+
+#+RESULTS:
+: static-site-custom
+
+*** Remove the Server Container
+#+begin_src shell :results verbatim
+docker remove static-site-custom
+#+end_src
+
+#+RESULTS:
+: static-site-custom
+
+*** Clean
+#+begin_src shell :results verbatim
+clj -T:clean
+#+end_src

@@ -1,0 +1,9 @@
+{:paths ["src"]
+ :deps {hiccup/hiccup {:mvn/version "2.0.0-RC3"}}
+ :aliases  {;; Run with clj -T:build function-in-build
+            :build {:deps
+                    {hiccup/hiccup {:mvn/version "2.0.0-RC3"}
+                     io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+                    
+                    :extra-paths ["src"]
+          :ns-default build}}}
