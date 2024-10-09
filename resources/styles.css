@@ -1,0 +1,55 @@
+header {
+    margin: 20px;
+    color: var(--headercolor);
+}
+
+header sub{
+    text-decoration: underline;
+    color: var(--headercolor);
+    font-variant: small-caps;
+    font-size:15px;
+    font-style: italic;
+    text-shadow: 1px 1px 1px black;
+}
+
+header h1 {
+    margin: 0px;
+    text-shadow: 2px 2px 2px black;
+}
+
+h1 a {
+    text-decoration:none;
+    color: var(--headercolor);
+}
+
+body {
+    background: var(--bg);
+    color: var(--fontcolor);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Container to hold the image */
+.image-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  opacity: 0.8; /* Adjust the opacity as needed */
+  z-index: 1000; /* Ensure the image is on top of other elements */
+}
+
+/* Styling the image */
+.image-container img {
+  max-width: 200px; /* Adjust the size of the image as needed */
+  height: auto; /* Maintain aspect ratio */
+  opacity: 0.5;
+}
+
+
+:root {
+    --bg:#293241 ;
+    --fontcolor: #3D5A80;
+    --headercolor: #E0FBFC;
+    --linkcolor: #EE6C4D;
+    --linkclickedcolor:#98C1D9;
+    --contentWidth: 1200px;
+}
