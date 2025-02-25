@@ -1,2 +1,2 @@
 ((nil . (
-         (projectile-project-run-cmd . "clj -T:build build"))))
+         (projectile-project-run-cmd . "clj -X build/build"))))

@@ -10,7 +10,7 @@
                 "target"))
     (run! io/delete-file (reverse (file-seq (io/file "target"))))))
 
-(defn build [_]
+(defn build [& args]
   (clean)
   (.mkdir (io/file "target"))
   (b/copy-dir {:src-dirs ["resources"]
