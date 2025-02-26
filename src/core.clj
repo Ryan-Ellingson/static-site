@@ -1,6 +1,10 @@
 (ns core
   (:require
-   [hiccup2.core :as h]))
+   [hiccup2.core :as h]
+   [clojure.string :as str]
+   [clojure.java.io :as io]
+   [clojure.edn :as edn])
+  (:import org.apache.commons.io.FileUtils))
 
 (defn page-wrapper
   "Wraps content so the site's consistent."
@@ -28,14 +32,74 @@
            [:header
             [:h1 [:a {:href "/"} "Ryan Ellingson"]]
             [:sub "Data Engineer"]]
-           [:body page other [:div {:class "image-container"}[:img {:src "/images/doge.png"}]]]
-;; <div class="image-container">
-;;   <img src="path_to_your_image.jpg" alt="Description of Image">
-;; </div>
+           [:body page other [:div {:class "image-container"} [:img {:src "/images/doge.png"}]]]]))
 
-           ]))
+
+(defn get-top-org-properties
+  "Get the top :PROPERTIES: key, value pairs."
+  [n]
+  (->> (str/split n #"\n")
+       (drop-while #(not= %  ":PROPERTIES:"))
+       (rest)
+       (take-while #(not= % ":END:"))
+       (map #(re-matches #":(\w+):\s+(.*)" %))
+       (map #(rest %))
+       (flatten)
+       (apply hash-map)))
+
+(defn get-org-keywords
+  "Get keywords, including title, filetags, etc."
+  [n]
+  (let [export-tags (->>
+                     (str/split n #"\n")
+                     (drop-while #(not= % ":END:"))
+                     (rest)
+                     (take-while #(re-matches #"#.*" %))
+                     (mapcat #(vector (last (re-matches #"#\+(\w+).*" %)) (last (re-matches #"\#\+\w+: (.*)" %))))
+                     (apply hash-map))]
+    (assoc export-tags "filetags" (rest (str/split (get export-tags "filetags") #":")))))
+
+(defn parse-heading
+  "Parse a heading line into a hiccup form"
+  [line]
+  [(keyword (str "h" (count (take-while #(not= % \space) line))))
+   (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))])
+
+(defn  parse-body
+  "Parsing the body of a blog."
+  [file-string]
+  (let
+   [lines (->>
+           (str/split file-string #"\n")
+           (drop-while #(not= % ":END:"))
+           rest
+           (drop-while #(re-matches #"#.*" %))
+           rest)]
+    (reduce (fn [accm, line]
+              (cond
+                (str/starts-with? line "[") (conj accm [:img {:src line}])
+                (= (first line) \*) (conj accm (parse-heading line))
+                (str/starts-with? line "#") accm ;;ignoring keywords of files for now
+                :else (conj accm [:p line])))
+            []
+            lines)))
+
+(defn blog-page [file-string]
+  (let
+   [keywords (get-org-keywords file-string)
+    title (get keywords "title")
+    tags (get keywords "tags")]
+    (vec (concat
+          [:main
+           [:h1 title]]
+          (parse-body file-string)))))
+
+(page-wrapper (blog-page file-string))
 
 (defn build-site
   "entry point to build the site"
   []
-  (spit "target/index.html" (str (page-wrapper [:span {:class "foo"} "bar"]))))
+  (->> (blog-page file-string)
+       page-wrapper
+       str
+       (spit "target/index.html")))
