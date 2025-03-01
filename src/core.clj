@@ -62,16 +62,18 @@
 (defn parse-heading
   "Parse a heading line into a hiccup form"
   [line]
-  [(keyword (str "h" (inc (count (take-while #(not= % \space) line))) ))
+  [(keyword (str "h" (inc (count (take-while #(not= % \space) line)))))
    (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))])
 
 (defn parse-image
   "Parse a file link into a hiccup form"
   [line]
-  (let [link-content (second (re-matches #"\[\[(.*):(.*)\]\]" line))
-        link-type (second link-content)
-        link (nth link-content 2)]
-    [:img {:src (second (re-matches #"\[\[file:(.*)\]\]" line))}]))
+  (let [image-file (io/file (str/replace-first (second (re-matches #"\[\[file:(.*)\]\]" line)) #"~" (System/getProperty "user.home")))
+        new-filepath (str "images/" (.getName image-file))]
+    (FileUtils/copyFileToDirectory
+     image-file
+     (io/file "target/images/"))
+    [:img {:src new-filepath}]))
 
 ;;WARN: this results in an infinite loop if we have a string that donesn't start with a \[ character
 (defn parse-bracket
@@ -106,9 +108,7 @@
                                                                                    [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" run)]
                                                                                     [:a {:href link} desc]))) ;;link
             (re-matches #"\[fn:.*\]" run) (recur (drop rc line) (let [n (apply str (take-while #(not= \] %) (drop 4 run)))]
-                                                                  (conj elem [:a {:name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))))
-
-;;image
+                                                                  (conj elem [:a {:name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]])))) ;;image
           )
         (let [run (apply str (take-while #(not= \[ %) line)) ;; if this is just text
               rc (count run)]
@@ -134,7 +134,9 @@
                        accm) ;; We ignore '#+ATTR_ORG' for images for now
                   \- (conj accm [:ul [:li line]])
                   \* (conj accm (parse-heading line))
-                  \[ (conj accm (parse-image line))
+                  \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
+                       (conj accm (parse-image line))
+                       (conj accm line)) ;;footnotes at end
                   (if (contains? #{:ul :code} last-element)
                     (conj (pop accm) (conj (last accm) line))
                     (if (empty? line)
@@ -153,7 +155,6 @@
           [:main
            [:h1 title]]
           (parse-body file-string)))))
-
 
 (defn build-site
   "entry point to build the site"
