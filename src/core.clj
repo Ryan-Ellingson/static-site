@@ -62,8 +62,57 @@
 (defn parse-heading
   "Parse a heading line into a hiccup form"
   [line]
-  [(keyword (str "h" (count (take-while #(not= % \space) line))))
+  [(keyword (str "h" (inc (count (take-while #(not= % \space) line))) ))
    (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))])
+
+(defn parse-image
+  "Parse a file link into a hiccup form"
+  [line]
+  (let [link-content (second (re-matches #"\[\[(.*):(.*)\]\]" line))
+        link-type (second link-content)
+        link (nth link-content 2)]
+    [:img {:src (second (re-matches #"\[\[file:(.*)\]\]" line))}]))
+
+;;WARN: this results in an infinite loop if we have a string that donesn't start with a \[ character
+(defn parse-bracket
+  "Parse out the first instance of a bracketed item at the start of the string"
+  [n]
+  (apply str (loop
+              [line (rest n)
+               elem [(first n)]
+               stack (list (first line))]
+               (if (or (empty? line) (empty? stack))
+                 elem
+                 (let [c (first line)]
+                   (case c
+                     \[ (recur (rest line) (conj elem c) (conj stack \[))
+                     \] (recur (rest line) (conj elem c) (pop stack))
+                     (recur (rest line) (conj elem c) stack)))))))
+
+(defn parse-paragraph
+  "Parse a paragraph, including text, links, and footnotes into a hiccup form"
+  [p-line]
+  (loop
+   [line p-line
+    elem [:p]]
+    (if (empty? line)
+      elem
+      (if (= \[ (first line)) ;; if this is a footnote, link, or image
+        (let [run (parse-bracket line)
+              rc (count run)]
+          (cond
+            (re-matches #"\[\[file:.*\]\]" run) (recur (drop rc line) (conj elem [:img {:src run}])) ;;Paragraph inline image
+            (re-matches #"\[\[https:.*\]\]" run) (recur (drop rc line) (conj elem (let
+                                                                                   [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" run)]
+                                                                                    [:a {:href link} desc]))) ;;link
+            (re-matches #"\[fn:.*\]" run) (recur (drop rc line) (let [n (apply str (take-while #(not= \] %) (drop 4 run)))]
+                                                                  (conj elem [:a {:name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))))
+
+;;image
+          )
+        (let [run (apply str (take-while #(not= \[ %) line)) ;; if this is just text
+              rc (count run)]
+          (recur (drop rc line) (conj elem run)))))))
 
 (defn  parse-body
   "Parsing the body of a blog."
@@ -75,12 +124,23 @@
            rest
            (drop-while #(re-matches #"#.*" %))
            rest)]
-    (reduce (fn [accm, line]
-              (cond
-                (str/starts-with? line "[") (conj accm [:img {:src line}])
-                (= (first line) \*) (conj accm (parse-heading line))
-                (str/starts-with? line "#") accm ;;ignoring keywords of files for now
-                :else (conj accm [:p line])))
+    (reduce (fn [accm line]
+              (let [fc (first line)
+                    fw (first (str/split line #" "))
+                    last-element (first (last accm))]
+                (case fc
+                  \# (if (= fw "#+begin_src")
+                       (conj accm [:code])
+                       accm) ;; We ignore '#+ATTR_ORG' for images for now
+                  \- (conj accm [:ul [:li line]])
+                  \* (conj accm (parse-heading line))
+                  \[ (conj accm (parse-image line))
+                  (if (contains? #{:ul :code} last-element)
+                    (conj (pop accm) (conj (last accm) line))
+                    (if (empty? line)
+                      accm
+                      (conj accm (parse-paragraph line)))))))
+
             []
             lines)))
 
@@ -94,7 +154,6 @@
            [:h1 title]]
           (parse-body file-string)))))
 
-(page-wrapper (blog-page file-string))
 
 (defn build-site
   "entry point to build the site"
