@@ -34,6 +34,33 @@
             [:sub "Data Engineer"]]
            [:body page other [:div {:class "image-container"} [:img {:src "/images/doge.png"}]]]]))
 
+(defn get-org-tags-from-file
+  "Given a path to an org file, extract the file tags from it"
+  [f]
+  (with-open
+   [r (io/reader f :encoding "ISO-8859-1")]
+    (let [tag-line (->> (line-seq r)
+                        (drop-while #(not (re-find #"\#\+filetags:" %)))
+                        first)]
+      (if tag-line
+        (set (drop 1 (->
+                      tag-line
+                      (str/split #" ")
+                      second
+                      (str/split #":"))))
+        #{}))))
+
+(defn get-blog-files
+  "Return a list of org roam files tagged with PYD"
+  []
+  (let [file-list (->> (.listFiles (io/file  (str (System/getProperty "user.home") "/org/roam")))
+                       (map #(.getPath %))
+                       (filter #(re-matches #".*\.org$" %)))]
+    (->> file-list
+         (map #(vector % (get-org-tags-from-file %)))
+         (filter #(contains? (second %) "PYD"))
+         (map first))))
+
 
 (defn get-top-org-properties
   "Get the top :PROPERTIES: key, value pairs."
