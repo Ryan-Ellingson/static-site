@@ -135,7 +135,7 @@
                                                                                    [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" run)]
                                                                                     [:a {:href link} desc]))) ;;link
             (re-matches #"\[fn:.*\]" run) (recur (drop rc line) (let [n (apply str (take-while #(not= \] %) (drop 4 run)))]
-                                                                  (conj elem [:a {:name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]])))) ;;image
+                                                                  (conj elem [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]])))) ;;image
           )
         (let [run (apply str (take-while #(not= \[ %) line)) ;; if this is just text
               rc (count run)]
@@ -166,7 +166,9 @@
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
-                       (conj accm line)) ;;footnotes at end
+                       (let [footnote-number (apply str (take-while #(not= \] %) (drop 4 line)))
+                             footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) line))) 0 :span)]
+                         (conj accm [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))) ;;footnotes at end
                   (if (and (= last-element-type :pre) (= :open (second last-element)))
                     (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
                     (if (empty? line)
