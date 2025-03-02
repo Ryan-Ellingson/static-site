@@ -118,28 +118,50 @@
                      \] (recur (rest line) (conj elem c) (pop stack))
                      (recur (rest line) (conj elem c) stack)))))))
 
+(defn parse-footnote
+  "Parse a string like [fn:n] into a footnote element"
+  [s]
+  (let
+   [n (apply str (take-while #(not= \] %) (drop 4 s)))]
+    [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))
+
+(defn parse-link
+  "Parse a string like [[https://example.com][a link]] into a anchor element"
+  [s]
+  (let
+   [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" s)]
+    [:a {:href link} desc]))
+
 (defn parse-paragraph
-  "Parse a paragraph, including text, links, and footnotes into a hiccup form"
-  [p-line]
-  (loop
-   [line p-line
-    elem [:p]]
-    (if (empty? line)
-      elem
-      (if (= \[ (first line)) ;; if this is a footnote, link, or image
-        (let [run (parse-bracket line)
-              rc (count run)]
-          (cond
-            (re-matches #"\[\[file:.*\]\]" run) (recur (drop rc line) (conj elem [:img {:src run}])) ;;Paragraph inline image
-            (re-matches #"\[\[https:.*\]\]" run) (recur (drop rc line) (conj elem (let
-                                                                                   [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" run)]
-                                                                                    [:a {:href link} desc]))) ;;link
-            (re-matches #"\[fn:.*\]" run) (recur (drop rc line) (let [n (apply str (take-while #(not= \] %) (drop 4 run)))]
-                                                                  (conj elem [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]])))) ;;image
-          )
-        (let [run (apply str (take-while #(not= \[ %) line)) ;; if this is just text
-              rc (count run)]
-          (recur (drop rc line) (conj elem run)))))))
+  "Parse a 'paragraph' line of text into an equivalent hiccup expression."
+  ([p-line] (parse-paragraph p-line [:p]))
+  ([p-line elem]
+   (if (empty? p-line)
+     elem
+     (if (contains? #{\~ \* \_ \/} (first p-line))
+       (let [run (apply str (take-while #(not (contains? #{\] \~ \* \_ \/} %)) (drop 1 p-line)))
+             rc (+ (count run) 2)
+             fc (first p-line)
+             new-p-line (drop rc p-line)]
+         (parse-paragraph new-p-line (conj elem
+                                           (case fc
+                                             \*  [:b run] ;; bold
+                                             \~  [:code run] ;; code
+                                             \_  [:u run] ;; underline
+                                             \/  [:i run])))) ;; italic
+       (if (= (first p-line) \[)
+         (let [run (parse-bracket p-line)
+               rc (count run)]
+           (parse-paragraph
+            (drop rc p-line)
+            (cond
+              (re-matches #"\[fn:.*\]" run) (conj elem (parse-footnote run))
+              (re-matches #"\[\[https:.*\]\]" run) (conj elem (parse-link run)))))
+
+         (let [run (apply str (take-while #(not (contains? #{\~ \* \_ \/ \[} %)) p-line))
+               rc (count run)]
+           (parse-paragraph (drop rc p-line) (conj elem run))))))))
+
 
 (defn  parse-body
   "Parsing the body of a blog."
