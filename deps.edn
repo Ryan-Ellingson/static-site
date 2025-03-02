@@ -2,6 +2,11 @@
  :deps {hiccup/hiccup {:mvn/version "2.0.0-RC3"}
         org.clojure/clojure #:mvn{:version "1.10.2"}
         commons-io/commons-io {:mvn/version "2.11.0"}
-        io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}}}
-
-
+        io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+  :build {:exec-fn build/build}}}
