@@ -17,9 +17,17 @@ Alternatively, if the container already exists, just start it.
 docker start static-site-custom
 #+end_src
 
+#+RESULTS:
+: static-site-custom
+
 ** Build The Site
 #+begin_src shell :results verbatim
-clj -X build/build
+clj -X:build
+#+end_src
+
+** Run tests
+#+begin_src shell 
+clj -X:test
 #+end_src
 
 ** Teardown
