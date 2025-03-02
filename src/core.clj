@@ -154,18 +154,21 @@
     (reduce (fn [accm line]
               (let [fc (first line)
                     fw (first (str/split line #" "))
-                    last-element (first (last accm))]
+                    last-element (last accm)
+                    last-element-type (first last-element)]
                 (case fc
                   \# (if (= fw "#+begin_src")
-                       (conj accm [:code])
-                       accm) ;; We ignore '#+ATTR_ORG' for images for now
-                  \- (conj accm [:ul [:li line]])
+                       (conj accm [:pre :open [:code {:class "language-clojure"}]])
+                       (conj (pop accm) [:pre (last last-element)])) ;; We ignore '#+ATTR_ORG' for images for now
+                  \- (if (= last-element-type :ul)
+                       (conj (pop accm) (conj last-element [:li (str/replace line #"^- " "")]))
+                       (conj accm [:ul [:li (str/replace line #"^- " "")]])) ;; No nested lists for now.
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
                        (conj accm line)) ;;footnotes at end
-                  (if (contains? #{:ul :code} last-element)
-                    (conj (pop accm) (conj (last accm) line))
+                  (if (and (= last-element-type :pre) (= :open (second last-element)))
+                    (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
                     (if (empty? line)
                       accm
                       (conj accm (parse-paragraph line)))))))
