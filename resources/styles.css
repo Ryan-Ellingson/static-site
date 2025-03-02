@@ -28,6 +28,15 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+.footnote {
+    color: var(--fontcolor);
+    text-decoration:none;
+}
+
+.footnote sub {
+    vertical-align: 0.3em;
+    font-size: 0.65em;
+}
 /* Container to hold the image */
 .image-container {
   position: fixed;
