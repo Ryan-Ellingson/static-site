@@ -89,8 +89,10 @@
 (defn parse-heading
   "Parse a heading line into a hiccup form"
   [line]
-  [(keyword (str "h" (inc (count (take-while #(not= % \space) line)))))
-   (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))])
+
+  (let [contents (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))]
+  [(keyword (str "h" (inc (count (take-while #(not= % \space) line))))) {:id (str/replace contents #" " "_")}
+   contents]))
 
 (defn parse-image
   "Parse a file link into a hiccup form"
@@ -207,7 +209,7 @@
     tags (get keywords "tags")]
     (vec (concat
           [:main
-           [:h1 title]]
+           [:h1 {:id (str/replace title #" " "_")} title]]
           (parse-body file-string)))))
 
 (defn build-site
