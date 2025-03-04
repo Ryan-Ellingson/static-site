@@ -215,6 +215,9 @@
 (defn build-site
   "entry point to build the site"
   []
+  (FileUtils/copyFileToDirectory
+   (io/file "resources/styles.css")
+   (io/file "target"))
   (->> (blog-page file-string)
        page-wrapper
        str
