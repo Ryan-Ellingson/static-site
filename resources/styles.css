@@ -60,6 +60,12 @@ main img{
     margin: auto;
     max-height: 100%;
     max-width: 100%;
+    box-shadow: 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+main code {
+    box-shadow: 4px 4px rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
 }
 
 .footnote {
