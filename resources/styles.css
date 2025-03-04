@@ -24,8 +24,42 @@ h1 a {
 
 body {
     background: var(--bg);
-    color: var(--fontcolor);
     -webkit-font-smoothing: antialiased;
+}
+
+main {
+    background-color: var(--maincolor);
+    color: var(--mainfontcolor);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 5px 5px black;
+
+}
+
+main h1,h2,h3,h4 {
+    color: var(--mainheadercolor);
+    margin-top: 5px;
+    margin-bottom: 5px;
+    text-shadow: 1px 1px 1px var(--bg);
+}
+
+main a {
+    color: var(--linkcolor);
+}
+
+main a:visited {
+    color: var(--linkvisitedcolor);
+}
+
+main a:hover {
+    color var(--linkhoveredcolor);
+}
+
+main img{
+    display: block;
+    margin: auto;
+    max-height: 100%;
+    max-width: 100%;
 }
 
 .footnote {
@@ -56,9 +90,12 @@ body {
 
 :root {
     --bg:#293241 ;
-    --fontcolor: #3D5A80;
+    --maincolor: #3D5A80;
+    --mainfontcolor: #E0FBFC;
     --headercolor: #E0FBFC;
+    --mainheadercolor: #EE6C4D;
     --linkcolor: #EE6C4D;
-    --linkclickedcolor:#98C1D9;
+    --linkvisitedcolor:#98C1D9;
+    --linkhoveredcolor:#98C1D9;
     --contentWidth: 1200px;
 }
