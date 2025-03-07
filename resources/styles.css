@@ -64,6 +64,14 @@ main img{
 }
 
 main code {
+    background-color: var(--bg);
+    padding: 2px 5px 2px 5px;
+    border-radius: 2px;
+    outline-style: solid;
+    outline-width: thin;
+}
+
+main pre code {
     box-shadow: 4px 4px rgba(0, 0, 0, 0.25);
     border-radius: 10px;
 }
@@ -77,13 +85,15 @@ main code {
     vertical-align: 0.3em;
     font-size: 0.65em;
 }
+
+
 /* Container to hold the image */
 .image-container {
   position: fixed;
   bottom: 0;
   right: 0;
   opacity: 0.8; /* Adjust the opacity as needed */
-  z-index: 1000; /* Ensure the image is on top of other elements */
+  z-index: 1; /* Ensure the image is on top of other elements */
 }
 
 /* Styling the image */
@@ -93,11 +103,48 @@ main code {
   opacity: 0.5;
 }
 
+.home-page h1 {
+    text-align: center;
+}
+
+.home-page div {
+    font-size: large;
+    outline-style: outset;
+    outline-color: var(--mainheadercolor); /*var(--headercolor);*/
+    background-color: var(--bg);
+    padding: 10px;
+}
+
+.blog-listing {
+    background-color:var(--bg);
+    padding: 10px;
+    border-radius: 5px;
+    outline-color: var(--mainheadercolor); /*var(--headercolor);*/
+    outline-style: outset;
+    box-shadow: 7px 7px rgba(0, 0, 0, 0.25);
+    margin: 10px;
+}
+
+.blog-listing p {
+    margin: 0px;
+
+}
+
+.blog-listing a {
+    text-decoration: underline;
+}
+
+.date {
+    margin-left: 10px;
+    color: var(--mainfontcolortransparent);
+    
+}
 
 :root {
     --bg:#293241 ;
     --maincolor: #3D5A80;
     --mainfontcolor: #E0FBFC;
+    --mainfontcolortransparent: rgba(88,98,99,0.75);
     --headercolor: #E0FBFC;
     --mainheadercolor: #EE6C4D;
     --linkcolor: #EE6C4D;
