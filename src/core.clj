@@ -2,8 +2,7 @@
   (:require
    [hiccup2.core :as h]
    [clojure.string :as str]
-   [clojure.java.io :as io]
-   [clojure.edn :as edn])
+   [clojure.java.io :as io])
   (:import org.apache.commons.io.FileUtils))
 
 (defn page-wrapper
@@ -24,7 +23,8 @@
             [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
            ;;Highlight.JS
            ;;Add code highlighting to code blocks
-           [:link {:href "https://unpkg.com/@highlightjs/cdn-assets@11.4.0/styles/obsidian.min.css" :rel "stylesheet" :type "text/css"}]
+           [:link {:href "https://unpkg.com/highlightjs@9.16.2/styles/gruvbox-dark.css" :rel "stylesheet" :type "text/css"}]
+
            [:script {:src "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js" :type "text/javascript"}]
            [:script {:src "https://unpkg.com/@highlightjs/cdn-assets@11.4.0/languages/clojure.min.js" :type "text/javascript"}]
            [:script {:src "https://unpkg.com/@highlightjs/cdn-assets@11.4.0/languages/go.min.js" :type "text/javascript"}]
@@ -34,6 +34,33 @@
             [:sub "Data Engineer"]]
            [:body page other [:div {:class "image-container"} [:img {:src "/images/doge.png"}]]]]))
 
+(defn get-blog-properties
+  [f]
+  (with-open
+   [r (io/reader f :encoding "ISO-8859-1")]
+    {:path f
+     :title (let [title (->> (line-seq r)
+                             (drop-while #(not (re-find #"\#\+title:" %)))
+                             first)]
+              (str/trim (second (str/split title #":"))))
+     :tags (let [tag-line (->> (line-seq r)
+                               (drop-while #(not (re-find #"\#\+filetags:" %)))
+                               first)]
+             (if tag-line
+               (set (drop 1 (->
+                             tag-line
+                             (str/split #" ")
+                             second
+                             (str/split #":"))))
+               #{}))
+     :slug (let [slug-line (->> (line-seq r)
+                                (drop-while #(not (re-find #"\#\+slug:" %)))
+                                first)]
+             (str/trim (second (str/split slug-line #":"))))
+     :pubDate  (let [pub-line (->> (line-seq r)
+                                   (drop-while #(not (re-find #"\#\+pubdate:" %)))
+                                   first)]
+                 (str/trim (second (str/split pub-line #":"))))}))
 (defn get-org-tags-from-file
   "Given a path to an org file, extract the file tags from it"
   [f]
@@ -50,17 +77,29 @@
                       (str/split #":"))))
         #{}))))
 
+(defn get-org-title-from-file
+  "Given a path to an org file, extract the file tags from it"
+  [f]
+  (with-open
+   [r (io/reader f :encoding "ISO-8859-1")]
+    (let [tag-line (->> (line-seq r)
+                        (drop-while #(not (re-find #"\#\+title:" %)))
+                        first)]
+      tag-line)))
+
 (defn get-blog-files
   "Return a list of org roam files tagged with PYD"
   []
-  (let [file-list (->> (.listFiles (io/file  (str (System/getProperty "user.home") "/org/roam")))
+  (let [file-list (->> (.listFiles
+                        (io/file
+                         (str (System/getProperty "user.home") "/org/roam")))
                        (map #(.getPath %))
                        (filter #(re-matches #".*\.org$" %)))]
     (->> file-list
          (map #(vector % (get-org-tags-from-file %)))
          (filter #(contains? (second %) "PYD"))
-         (map first))))
-
+         (map first)
+         (map get-blog-properties))))
 
 (defn get-top-org-properties
   "Get the top :PROPERTIES: key, value pairs."
@@ -91,14 +130,14 @@
   [line]
 
   (let [contents (apply str (apply str (take-while #(not= % \:) (drop-while #(or (= % \*) (= % \space)) line))))]
-  [(keyword (str "h" (inc (count (take-while #(not= % \space) line))))) {:id (str/replace contents #" " "_")}
-   contents]))
+    [(keyword (str "h" (inc (count (take-while #(not= % \space) line))))) {:id (str/replace contents #" " "_")}
+     contents]))
 
 (defn parse-image
   "Parse a file link into a hiccup form"
   [line]
   (let [image-file (io/file (str/replace-first (second (re-matches #"\[\[file:(.*)\]\]" line)) #"~" (System/getProperty "user.home")))
-        new-filepath (str "images/" (.getName image-file))]
+        new-filepath (str "/images/" (.getName image-file))]
     (FileUtils/copyFileToDirectory
      image-file
      (io/file "target/images/"))
@@ -202,15 +241,27 @@
             []
             lines)))
 
-(defn blog-page [file-string]
-  (let
-   [keywords (get-org-keywords file-string)
-    title (get keywords "title")
-    tags (get keywords "tags")]
-    (vec (concat
-          [:main
-           [:h1 {:id (str/replace title #" " "_")} title]]
-          (parse-body file-string)))))
+(defn blog-page [{:keys [path title tags pubDate]}]
+  (vec (concat
+        [:main
+         [:h1 {:id (str/replace title #" " "_")} title]]
+        (parse-body (slurp path)))))
+
+(defn create-blog-page [blog-info]
+  (->> blog-info
+       blog-page
+       page-wrapper
+       (spit (str "target/blogs/" (str/replace (:title blog-info) #" " "-") ".html"))))
+
+(defn home-page [blog-info]
+  [:main {:class "home-page"}
+   [:h1 "👋 Hello!"]
+   [:div "I'm Ryan. I write here about software engineering, data, and other adjacent topics. Thanks for stopping by!"]
+   [:h1 "🗒 Blog list"]
+   (map (fn [{:keys [title tags slug pubDate]}]
+          [:div {:class "blog-listing"}
+           [:a {:href (str "/blogs/" (str/replace title #" " "-"))} title] [:span {:class "date"} pubDate]
+           [:p slug]]) blog-info)])
 
 (defn build-site
   "entry point to build the site"
@@ -218,7 +269,10 @@
   (FileUtils/copyFileToDirectory
    (io/file "resources/styles.css")
    (io/file "target"))
-  (->> (blog-page file-string)
-       page-wrapper
-       str
-       (spit "target/index.html")))
+  (let [blog-info (get-blog-files)]
+    (->> (home-page blog-info)
+         page-wrapper
+         (spit "target/index.html"))
+    (doall (map create-blog-page (get-blog-files)))))
+
+
