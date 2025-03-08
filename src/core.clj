@@ -180,7 +180,8 @@
    (if (empty? p-line)
      elem
      (if (contains? #{\~ \* \_ \/} (first p-line))
-       (let [run (apply str (take-while #(not (contains? #{\] \~ \* \_ \/} %)) (drop 1 p-line)))
+       (let [stopping-char (first p-line)
+             run (apply str (take-while #(not (= stopping-char %)) (drop 1 p-line)))
              rc (+ (count run) 2)
              fc (first p-line)
              new-p-line (drop rc p-line)]
