@@ -219,15 +219,14 @@
                           li (if (= :ul (first elem)) (dec level) level))))) ;; Only decrement if we're descending into a sub-list
 
 (defn  parse-body
-  "Parsing the body of a blog."
+  "Parses the body of a org document into a vector containing hiccup forms."
   [file-string]
   (let
    [lines (->>
            (str/split file-string #"\n")
            (drop-while #(not= % ":END:"))
            rest
-           (drop-while #(re-matches #"#.*" %))
-           rest)]
+           (drop-while #(re-matches #"#.*" %)))]
     (reduce (fn [accm line]
               (let [fc (first line)
                     fw (first (str/split line #" "))
@@ -239,22 +238,23 @@
                        (conj (pop accm) [:pre (last last-element)])) ;; We ignore '#+ATTR_ORG' for images for now
                   \- (if (= last-element-type :ul)
                        (conj (pop accm) (conj last-element [:li (parse-paragraph (str/replace line #"^- " ""))]))
-                       (conj accm [:ul [:li (parse-paragraph (str/replace line #"^- " ""))]])) ;; No nested lists for now.
+                       (conj accm [:ul [:li (parse-paragraph (str/replace line #"^- " ""))]]))
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
                        (let [footnote-number (apply str (take-while #(not= \] %) (drop 4 line)))
                              footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) line))) 0 :span)]
                          (conj accm [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))) ;;footnotes at end
-                  (if (and (= last-element-type :pre) (= :open (second last-element)))
-                    (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
-                    (if (re-matches #"^\ *-.*" line)
-                      (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
-                        (conj (pop accm) (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level)))
-                      (if (empty? line)
-                        accm
 
-                        (conj accm (parse-paragraph line))))))))
+                  (cond
+                    (and (= last-element-type :pre)
+                         (= :open (second last-element))) (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
+                    (re-matches #"^\ *-.*" line) (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
+                                                   (conj
+                                                    (pop accm)
+                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level)))
+                    (empty? line) accm
+                    :else  (conj accm (parse-paragraph line))))))
 
             []
             lines)))
