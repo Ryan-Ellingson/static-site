@@ -24,7 +24,6 @@
            ;;Highlight.JS
            ;;Add code highlighting to code blocks
            [:link {:href "https://unpkg.com/highlightjs@9.16.2/styles/gruvbox-dark.css" :rel "stylesheet" :type "text/css"}]
-
            [:script {:src "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js" :type "text/javascript"}]
            [:script {:src "https://unpkg.com/@highlightjs/cdn-assets@11.4.0/languages/clojure.min.js" :type "text/javascript"}]
            [:script {:src "https://unpkg.com/@highlightjs/cdn-assets@11.4.0/languages/go.min.js" :type "text/javascript"}]
@@ -34,11 +33,44 @@
             [:sub "Data Engineer"]]
            [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
+
+(defn add-publish-record
+  "Add a new publish record"
+  [id title section pubDate]
+  (with-open [writer (io/writer "publish-record.csv" :append true)]
+    (let [csv-line (str id "," title "," section "," pubDate "\n")]
+      (.write writer csv-line))))
+
+(defn get-all-publish-records
+  "Return a vector of maps for all publish records"
+  []
+  (with-open [r (io/reader "publish-record.csv")]
+    (let [lines (line-seq r)
+          headers (str/split (first lines) #",")
+          publish-lines (rest lines)]
+      (mapv (fn [line]
+              (let [values (map str/trim (str/split line #","))]
+                (zipmap (map keyword headers) values)))
+            publish-lines))))
+
+(defn get-publish-record-by-id
+  "Get the publish record by org-roam id"
+  [id]
+  (first
+   (filter #(= id (:id %)) (get-all-publish-records))))
+
+
 (defn get-blog-properties
+  "Get properties of a blog from it's org-roam page"
   [f]
   (with-open
    [r (io/reader f :encoding "ISO-8859-1")]
     {:path f
+     :id (let [id-line (->> (line-seq r)
+                          (drop-while #(not (re-find #":ID:" %)))
+                          first)]
+           (second (str/split id-line #"\ +")))
+
      :title (let [title (->> (line-seq r)
                              (drop-while #(not (re-find #"\#\+title:" %)))
                              first)]
@@ -62,7 +94,6 @@
                                    first)]
                  (str/trim (second (str/split pub-line #":"))))}))
 
-
 (defn get-org-tags-from-file
   "Given a path to an org file, extract the file tags from it"
   [f]
@@ -79,15 +110,6 @@
                       (str/split #":"))))
         #{}))))
 
-(defn get-org-title-from-file
-  "Given a path to an org file, extract the file tags from it"
-  [f]
-  (with-open
-   [r (io/reader f :encoding "ISO-8859-1")]
-    (let [tag-line (->> (line-seq r)
-                        (drop-while #(not (re-find #"\#\+title:" %)))
-                        first)]
-      tag-line)))
 
 (defn get-blog-files
   "Return a list of org roam files tagged with PYD"
@@ -175,6 +197,15 @@
    [n (apply str (take-while #(not= \] %) (drop 4 s)))]
     [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))
 
+
+(defn parse-local-link
+  "Parse a string like [[id:some-roam-unique-id][link name]] into a link element"
+  [s]
+  (let
+   [[_ id remark]  (re-find #"\[\[id\:(.*)\]\[(.*)\]\]" s)
+    link (str "/blogs/" (str/replace (:title (get-publish-record-by-id id)) " " "-"))]
+    [:a {:href link} remark]))
+
 (defn parse-paragraph
   "Parse a 'paragraph' line of text into an equivalent hiccup expression."
   ([p-line] (parse-paragraph p-line [:p]))
@@ -200,11 +231,13 @@
             (drop rc p-line)
             (cond
               (re-matches #"\[fn:.*\]" run) (conj elem (parse-footnote run))
-              (re-matches #"\[\[https:.*\]\]" run) (conj elem (parse-link run)))))
+              (re-matches #"\[\[https:.*\]\]" run) (conj elem (parse-link run))
+              (re-matches #"\[\[id:.*\]\[.*\]\]" run) (conj elem (parse-local-link run)))))
 
          (let [run (apply str (take-while #(not (contains? #{\~ \* \_ \/ \[} %)) p-line))
                rc (count run)]
            (parse-paragraph (drop rc p-line) (conj elem run))))))))
+
 
 (defn parse-ending-footnote
   "Parse a footnote at the end of the file of form \"[fn:n] footnote content\" into a footnote element"
@@ -299,6 +332,9 @@
    (io/file "resources/styles.css")
    (io/file "target"))
   (let [blog-info (get-blog-files)]
+    (doseq [{:keys [id title pubDate]} blog-info]
+      (when (not (get-publish-record-by-id id))
+        (add-publish-record id title "blogs" pubDate)))
     (->> (home-page blog-info)
          page-wrapper
          (spit "target/index.html"))
