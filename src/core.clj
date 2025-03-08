@@ -206,6 +206,18 @@
                rc (count run)]
            (parse-paragraph (drop rc p-line) (conj elem run))))))))
 
+(defn add-element-to-list
+  "Add a list element to an unordered list at the specified indentation level."
+  [elem li level]
+  (if (= level 0)
+    (if (= (first elem) :ul)
+      (conj elem li) ;; The list already existed
+      (conj elem [:ul li])) ;; we needed to create the new sub-list
+    (conj
+     (pop elem)
+     (add-element-to-list (last elem)
+                          li (if (= :ul (first elem)) (dec level) level))))) ;; Only decrement if we're descending into a sub-list
+
 (defn  parse-body
   "Parsing the body of a blog."
   [file-string]
@@ -236,9 +248,13 @@
                          (conj accm [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))) ;;footnotes at end
                   (if (and (= last-element-type :pre) (= :open (second last-element)))
                     (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
-                    (if (empty? line)
-                      accm
-                      (conj accm (parse-paragraph line)))))))
+                    (if (re-matches #"^\ *-.*" line)
+                      (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
+                        (conj (pop accm) (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level)))
+                      (if (empty? line)
+                        accm
+
+                        (conj accm (parse-paragraph line))))))))
 
             []
             lines)))
