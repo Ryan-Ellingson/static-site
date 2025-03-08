@@ -225,6 +225,12 @@
      (add-element-to-list (last elem)
                           li (if (= :ul (first elem)) (dec level) level))))) ;; Only decrement if we're descending into a sub-list
 
+(defn begin-code-block
+  "Parse a language from a 'begin_src' line and starts a code block with it"
+  [s]
+  (let [lang (second (re-matches #"\#\+begin_src\ (\w*).*" s))]
+    [:pre :open [:code {:class lang}]]))
+
 (defn  parse-body
   "Parses the body of a org document into a vector containing hiccup forms."
   [file-string]
@@ -241,7 +247,7 @@
                     last-element-type (first last-element)]
                 (case fc
                   \# (if (= fw "#+begin_src")
-                       (conj accm [:pre :open [:code {:class "language-clojure"}]]) ;; Open a code block
+                       (conj accm (begin-code-block line)) ;; Open a code block
                        (conj (pop accm) [:pre (last last-element)])) ;; Close a code block
                   \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " ""))]]
                        (if (= last-element-type :ul)
