@@ -61,6 +61,8 @@
                                    (drop-while #(not (re-find #"\#\+pubdate:" %)))
                                    first)]
                  (str/trim (second (str/split pub-line #":"))))}))
+
+
 (defn get-org-tags-from-file
   "Given a path to an org file, extract the file tags from it"
   [f]
@@ -204,7 +206,6 @@
                rc (count run)]
            (parse-paragraph (drop rc p-line) (conj elem run))))))))
 
-
 (defn  parse-body
   "Parsing the body of a blog."
   [file-string]
@@ -225,8 +226,8 @@
                        (conj accm [:pre :open [:code {:class "language-clojure"}]])
                        (conj (pop accm) [:pre (last last-element)])) ;; We ignore '#+ATTR_ORG' for images for now
                   \- (if (= last-element-type :ul)
-                       (conj (pop accm) (conj last-element [:li (str/replace line #"^- " "")]))
-                       (conj accm [:ul [:li (str/replace line #"^- " "")]])) ;; No nested lists for now.
+                       (conj (pop accm) (conj last-element [:li (parse-paragraph (str/replace line #"^- " ""))]))
+                       (conj accm [:ul [:li (parse-paragraph (str/replace line #"^- " ""))]])) ;; No nested lists for now.
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
@@ -275,5 +276,3 @@
          page-wrapper
          (spit "target/index.html"))
     (doall (map create-blog-page (get-blog-files)))))
-
-
