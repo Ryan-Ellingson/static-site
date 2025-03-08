@@ -161,19 +161,19 @@
                      \] (recur (rest line) (conj elem c) (pop stack))
                      (recur (rest line) (conj elem c) stack)))))))
 
-(defn parse-footnote
-  "Parse a string like [fn:n] into a footnote element"
-  [s]
-  (let
-   [n (apply str (take-while #(not= \] %) (drop 4 s)))]
-    [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))
-
 (defn parse-link
   "Parse a string like [[https://example.com][a link]] into a anchor element"
   [s]
   (let
    [[_ link desc]  (re-find #"\[\[(.*)\]\[(.*)\]\]" s)]
     [:a {:href link} desc]))
+
+(defn parse-footnote
+  "Parse a string like [fn:n] into a footnote-sub element"
+  [s]
+  (let
+   [n (apply str (take-while #(not= \] %) (drop 4 s)))]
+    [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))
 
 (defn parse-paragraph
   "Parse a 'paragraph' line of text into an equivalent hiccup expression."
@@ -206,6 +206,13 @@
                rc (count run)]
            (parse-paragraph (drop rc p-line) (conj elem run))))))))
 
+(defn parse-ending-footnote
+  "Parse a footnote at the end of the file of form \"[fn:n] footnote content\" into a footnote element"
+  [s]
+  (let [footnote-number (apply str (take-while #(not= \] %) (drop 4 s)))
+        footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) s))) 0 :span)]
+    [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))
+
 (defn add-element-to-list
   "Add a list element to an unordered list at the specified indentation level."
   [elem li level]
@@ -234,26 +241,24 @@
                     last-element-type (first last-element)]
                 (case fc
                   \# (if (= fw "#+begin_src")
-                       (conj accm [:pre :open [:code {:class "language-clojure"}]])
-                       (conj (pop accm) [:pre (last last-element)])) ;; We ignore '#+ATTR_ORG' for images for now
-                  \- (if (= last-element-type :ul)
-                       (conj (pop accm) (conj last-element [:li (parse-paragraph (str/replace line #"^- " ""))]))
-                       (conj accm [:ul [:li (parse-paragraph (str/replace line #"^- " ""))]]))
+                       (conj accm [:pre :open [:code {:class "language-clojure"}]]) ;; Open a code block
+                       (conj (pop accm) [:pre (last last-element)])) ;; Close a code block
+                  \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " ""))]]
+                       (if (= last-element-type :ul)
+                         (conj (pop accm) (conj last-element line-element)) ;; Append to the list
+                         (conj accm [:ul line-element]))) ;; Start a new list
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
-                       (let [footnote-number (apply str (take-while #(not= \] %) (drop 4 line)))
-                             footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) line))) 0 :span)]
-                         (conj accm [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))) ;;footnotes at end
-
+                       (conj accm (parse-ending-footnote line)))
                   (cond
                     (and (= last-element-type :pre)
                          (= :open (second last-element))) (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
                     (re-matches #"^\ *-.*" line) (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
                                                    (conj
                                                     (pop accm)
-                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level)))
-                    (empty? line) accm
+                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level))) ;; Nested lists
+                    (empty? line) accm ;; We ignore empty lines here.
                     :else  (conj accm (parse-paragraph line))))))
 
             []
