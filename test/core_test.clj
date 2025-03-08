@@ -34,5 +34,9 @@
         "Mis-parse of footnote")
   (t/is (=
          (c/parse-paragraph "A line with a [[https://example.com][link]] in the middle")
-         [:p "A line with a " [:a {:href "https://example.com" } "link"] " in the middle"])
-        "Mis-parse of a link"))
+         [:p "A line with a " [:a {:href "https://example.com"} "link"] " in the middle"])
+        "Mis-parse of a link")
+  (t/is (=
+         (c/parse-paragraph "Ignore ~/target~ the backslash in the code block")
+         [:p "Ignore " [:code "/target"] " the backslash in the code block"])
+        "Didn't ignore backslash in code block."))
