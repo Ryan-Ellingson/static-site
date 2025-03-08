@@ -3,8 +3,8 @@
             [core :as c]))
 
 (t/deftest test-parsing-heading
-  (t/is (= [:h2 "a first heading"] (c/parse-heading "* a first heading")))
-  (t/is (= [:h3 "a second heading"] (c/parse-heading "** a second heading"))))
+  (t/is (= [:h2 {:id "a_first_heading"} "a first heading"] (c/parse-heading "* a first heading")))
+  (t/is (= [:h3 {:id "a_second_heading"} "a second heading"] (c/parse-heading "** a second heading"))))
 
 (t/deftest test-parsing-paragraph
   (t/is (=
@@ -39,4 +39,19 @@
   (t/is (=
          (c/parse-paragraph "Ignore ~/target~ the backslash in the code block")
          [:p "Ignore " [:code "/target"] " the backslash in the code block"])
-        "Didn't ignore backslash in code block."))
+        "Didn't ignore backslash in code block.")
+  (t/is (=
+         (c/parse-paragraph "we're going to be [[id:6545bad5-06a5-413f-b472-a5f7d6a18291][Tracking Goals with Clojure and Sqlite]]")
+         [:p "we're going to be " [:a {:href "/blogs/Tracking-Goals-with-Clojure-and-Sqlite"} "Tracking Goals with Clojure and Sqlite"]])
+        "Didn't parse local link correctly"))
+
+(t/deftest test-parsing-body
+  (t/is (=
+         (c/parse-body ":END:\n#+foo\n- line\n  - indent 1\n    - indent 2\n  - indent 1\n- line\n  - indent 1")
+         [[:ul [:li [:p "line"]
+                [:ul [:li [:p "indent 1"]
+                      [:ul [:li [:p "indent 2"]]]]]
+                [:ul [:li [:p "indent 1"]]]]
+           [:li [:p "line"]
+            [:ul [:li [:p "indent 1"]]]]]])
+        "Incorrectly parsed nested lines"))
