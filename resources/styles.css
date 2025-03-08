@@ -87,19 +87,17 @@ main pre code {
 }
 
 
-/* Container to hold the image */
-.image-container {
+.watermark-image {
   position: fixed;
-  bottom: 0;
-  right: 0;
-  opacity: 0.8; /* Adjust the opacity as needed */
-  z-index: 1; /* Ensure the image is on top of other elements */
+  bottom: 10;
+  right: 10;
+  opacity: 0.8; 
+  z-index: 1; 
 }
 
-/* Styling the image */
-.image-container img {
-  max-width: 200px; /* Adjust the size of the image as needed */
-  height: auto; /* Maintain aspect ratio */
+.watermark-image img {
+  max-width: 200px; 
+  height: auto; 
   opacity: 0.5;
 }
 

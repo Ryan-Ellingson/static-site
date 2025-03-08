@@ -32,7 +32,7 @@
            [:header
             [:h1 [:a {:href "/"} "Ryan Ellingson"]]
             [:sub "Data Engineer"]]
-           [:body page other [:div {:class "image-container"} [:img {:src "/images/doge.png"}]]]]))
+           [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
 (defn get-blog-properties
   [f]
