@@ -30,9 +30,16 @@
            [:script "hljs.highlightAll();"]
            [:header
             [:h1 [:a {:href "/"} "Ryan Ellingson"]]
-            [:sub "Data Engineer"]]
-           [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
+            [:sub "Data Engineer"]
+            [:nav
+             (into [:ul {:class "menu-bar"}]
+                   (mapv (fn [[link label]]
+                           [:a {:href link}  [:li  label]])
+                         [["/" "home"]
+                          ["https://github.com/Ryan-Ellingson" "github"]
+                          ["/rss.xml" "rss"]]))]]
 
+           [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
 (defn add-publish-record
   "Add a new publish record"
@@ -59,7 +66,6 @@
   (first
    (filter #(= id (:id %)) (get-all-publish-records))))
 
-
 (defn get-blog-properties
   "Get properties of a blog from it's org-roam page"
   [f]
@@ -67,8 +73,8 @@
    [r (io/reader f :encoding "ISO-8859-1")]
     {:path f
      :id (let [id-line (->> (line-seq r)
-                          (drop-while #(not (re-find #":ID:" %)))
-                          first)]
+                            (drop-while #(not (re-find #":ID:" %)))
+                            first)]
            (second (str/split id-line #"\ +")))
 
      :title (let [title (->> (line-seq r)
@@ -109,7 +115,6 @@
                       second
                       (str/split #":"))))
         #{}))))
-
 
 (defn get-blog-files
   "Return a list of org roam files tagged with PYD"
@@ -197,7 +202,6 @@
    [n (apply str (take-while #(not= \] %) (drop 4 s)))]
     [:a {:class "footnote" :name (str "back_" n) :href (str "#footnote_" n)} [:sub (str "[" n "]")]]))
 
-
 (defn parse-local-link
   "Parse a string like [[id:some-roam-unique-id][link name]] into a link element"
   [s]
@@ -237,7 +241,6 @@
          (let [run (apply str (take-while #(not (contains? #{\~ \* \_ \/ \[} %)) p-line))
                rc (count run)]
            (parse-paragraph (drop rc p-line) (conj elem run))))))))
-
 
 (defn parse-ending-footnote
   "Parse a footnote at the end of the file of form \"[fn:n] footnote content\" into a footnote element"
