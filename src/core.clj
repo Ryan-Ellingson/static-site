@@ -3,7 +3,11 @@
    [hiccup2.core :as h]
    [clojure.string :as str]
    [clojure.java.io :as io])
-  (:import org.apache.commons.io.FileUtils))
+
+  (:import org.apache.commons.io.FileUtils
+           [java.time.format DateTimeFormatter]
+           [java.time ZonedDateTime]
+           [java.util Locale]))
 
 (defn page-wrapper
   "Wraps content so the site's consistent."
@@ -40,6 +44,12 @@
                           ["/rss.xml" "rss"]]))]]
 
            [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
+
+(defn rfc->dmy
+  "Convert an RFC 822/2822 date string to a dd-MM-yyyy format"
+  [rfc-date]
+  (-> (ZonedDateTime/parse rfc-date (DateTimeFormatter/ofPattern "EEE, dd MMM yyyy HH:mm:ss Z" Locale/US))
+      (.format (DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
 
 (defn add-publish-record
   "Add a new publish record"
@@ -98,7 +108,8 @@
      :pubDate  (let [pub-line (->> (line-seq r)
                                    (drop-while #(not (re-find #"\#\+pubdate:" %)))
                                    first)]
-                 (str/trim (second (str/split pub-line #":"))))}))
+                 (str/trim (second
+                            (re-find #"\#\+pubdate:\ ?(.*)\ ?" pub-line))))}))
 
 (defn get-org-tags-from-file
   "Given a path to an org file, extract the file tags from it"
@@ -325,8 +336,14 @@
    [:h1 "🗒 Blog list"]
    (map (fn [{:keys [title tags slug pubDate]}]
           [:div {:class "blog-listing"}
-           [:a {:href (str "/blogs/" (str/replace title #" " "-"))} title] [:span {:class "date"} pubDate]
-           [:p slug]]) blog-info)])
+           [:a {:href (str "/blogs/" (str/replace title #" " "-"))} title] [:span {:class "date"} (rfc->dmy pubDate)]
+           [:p slug]])
+        (sort-by (fn [{:keys [pubDate]}]
+                   (java.time.ZonedDateTime/parse pubDate (java.time.format.DateTimeFormatter/ofPattern
+                                                           "EEE, dd MMM yyyy HH:mm:ss Z"
+                                                           java.util.Locale/US)))
+                 #(compare %2 %1) ;; Descending order of date
+                 blog-info))])
 
 (defn build-site
   "entry point to build the site"
