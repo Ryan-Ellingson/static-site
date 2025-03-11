@@ -6,7 +6,7 @@
 
   (:import org.apache.commons.io.FileUtils
            [java.time.format DateTimeFormatter]
-           [java.time ZonedDateTime]
+           [java.time ZonedDateTime ZoneOffset]
            [java.util Locale]))
 
 (defn page-wrapper
@@ -41,8 +41,7 @@
                            [:a {:href link}  [:li  label]])
                          [["/" "home"]
                           ["https://github.com/Ryan-Ellingson" "github"]
-                          ["/rss.xml" "rss"]]))]]
-
+                          ["/feed.xml" "rss"]]))]]
            [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
 (defn rfc->dmy
@@ -50,6 +49,18 @@
   [rfc-date]
   (-> (ZonedDateTime/parse rfc-date (DateTimeFormatter/ofPattern "EEE, dd MMM yyyy HH:mm:ss Z" Locale/US))
       (.format (DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
+
+(defn current-rfc822-timestamp
+  "Generate current timestamp in RFC 822/2822 format."
+  []
+  (.format (ZonedDateTime/now ZoneOffset/UTC)
+           (DateTimeFormatter/ofPattern
+            "EEE, dd MMM yyyy HH:mm:ss Z"
+            Locale/US)))
+
+(defn get-blog-link-from-title
+  [title]
+  (str "/blogs/" (str/replace title #" " "-")))
 
 (defn add-publish-record
   "Add a new publish record"
@@ -127,8 +138,8 @@
                       (str/split #":"))))
         #{}))))
 
-(defn get-blog-files
-  "Return a list of org roam files tagged with PYD"
+(defn get-blog-metadata
+  "Return a list of maps containing blog metadata from org roam files tagged with PYD"
   []
   (let [file-list (->> (.listFiles
                         (io/file
@@ -139,7 +150,12 @@
          (map #(vector % (get-org-tags-from-file %)))
          (filter #(contains? (second %) "PYD"))
          (map first)
-         (map get-blog-properties))))
+         (map get-blog-properties)
+         (sort-by (fn [{:keys [pubDate]}]
+                    (java.time.ZonedDateTime/parse pubDate (java.time.format.DateTimeFormatter/ofPattern
+                                                            "EEE, dd MMM yyyy HH:mm:ss Z"
+                                                            java.util.Locale/US)))
+                  #(compare %2 %1)))))
 
 (defn get-top-org-properties
   "Get the top :PROPERTIES: key, value pairs."
@@ -336,14 +352,40 @@
    [:h1 "🗒 Blog list"]
    (map (fn [{:keys [title tags slug pubDate]}]
           [:div {:class "blog-listing"}
-           [:a {:href (str "/blogs/" (str/replace title #" " "-"))} title] [:span {:class "date"} (rfc->dmy pubDate)]
+           [:a {:href (get-blog-link-from-title title)} title] [:span {:class "date"} (rfc->dmy pubDate)]
            [:p slug]])
-        (sort-by (fn [{:keys [pubDate]}]
-                   (java.time.ZonedDateTime/parse pubDate (java.time.format.DateTimeFormatter/ofPattern
-                                                           "EEE, dd MMM yyyy HH:mm:ss Z"
-                                                           java.util.Locale/US)))
-                 #(compare %2 %1) ;; Descending order of date
-                 blog-info))])
+        blog-info)])
+
+(defn generate-rss-feed
+  "Generate an RSS feed from a collection of posts"
+  [blog-info]
+  (h/html
+   {:mode :xml}
+   [:rss {:version "2.0"
+          :xmlns:atom "http://www.w3.org/2005/Atom"
+          :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
+    [:channel
+     [:title "Ryan Ellingson"]
+     [:description]
+     [:link "https://www.ryanellingson.blog"]
+     [:atom:link {:href "https://www.ryanellingson.blog/feed.xml"
+                  :rel "self"
+                  :type "application/rss+xml"}]
+     [:pubDate (-> blog-info first :pubDate)]
+     [:lastBuildDate  (current-rfc822-timestamp)]
+     [:language "en-US"]
+
+     ;; Generate an item for each post
+     (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
+       (let [link (get-blog-link-from-title title)]
+         [:item
+          [:title title]
+          [:link link]
+          [:description slug]
+          [:pubDate pubDate]
+          [:author "Ryan Ellingson"]
+          [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.blog" link)]
+          [:content:encoded (h/html (blog-page blog-metadata))]]))]]))
 
 (defn build-site
   "entry point to build the site"
@@ -351,11 +393,12 @@
   (FileUtils/copyFileToDirectory
    (io/file "resources/styles.css")
    (io/file "target"))
-  (let [blog-info (get-blog-files)]
+  (let [blog-info (get-blog-metadata)]
     (doseq [{:keys [id title pubDate]} blog-info]
       (when (not (get-publish-record-by-id id))
         (add-publish-record id title "blogs" pubDate)))
     (->> (home-page blog-info)
          page-wrapper
          (spit "target/index.html"))
-    (doall (map create-blog-page (get-blog-files)))))
+    (doall (map create-blog-page (get-blog-metadata)))
+    (spit "target/feed.xml" (generate-rss-feed blog-info))))
