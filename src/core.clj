@@ -1,6 +1,7 @@
 (ns core
   (:require
    [hiccup2.core :as h]
+   [hiccup.util :refer [raw-string]]
    [clojure.string :as str]
    [clojure.java.io :as io])
 
@@ -359,6 +360,7 @@
 (defn generate-rss-feed
   "Generate an RSS feed from a collection of posts"
   [blog-info]
+ (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
   (h/html
    {:mode :xml}
    [:rss {:version "2.0"
@@ -385,7 +387,7 @@
           [:pubDate pubDate]
           [:author "Ryan Ellingson"]
           [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.blog" link)]
-          [:content:encoded (h/html (blog-page blog-metadata))]]))]]))
+          [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page blog-metadata)) "]]>" ))]]))]])))
 
 (defn build-site
   "entry point to build the site"
