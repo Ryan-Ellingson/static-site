@@ -63,31 +63,6 @@
   [title]
   (str "/blogs/" (str/replace title #" " "-")))
 
-(defn add-publish-record
-  "Add a new publish record"
-  [id title section pubDate]
-  (with-open [writer (io/writer "publish-record.csv" :append true)]
-    (let [csv-line (str id "," title "," section "," pubDate "\n")]
-      (.write writer csv-line))))
-
-(defn get-all-publish-records
-  "Return a vector of maps for all publish records"
-  []
-  (with-open [r (io/reader "publish-record.csv")]
-    (let [lines (line-seq r)
-          headers (str/split (first lines) #",")
-          publish-lines (rest lines)]
-      (mapv (fn [line]
-              (let [values (map str/trim (str/split line #","))]
-                (zipmap (map keyword headers) values)))
-            publish-lines))))
-
-(defn get-publish-record-by-id
-  "Get the publish record by org-roam id"
-  [id]
-  (first
-   (filter #(= id (:id %)) (get-all-publish-records))))
-
 (defn get-blog-properties
   "Get properties of a blog from it's org-roam page"
   [f]
@@ -232,16 +207,16 @@
 
 (defn parse-local-link
   "Parse a string like [[id:some-roam-unique-id][link name]] into a link element"
-  [s]
+  [s local-links]
   (let
    [[_ id remark]  (re-find #"\[\[id\:(.*)\]\[(.*)\]\]" s)
-    link (str "/blogs/" (str/replace (:title (get-publish-record-by-id id)) " " "-"))]
+    link (:link (first (filter #(= id (:id %)) local-links)))]
     [:a {:href link} remark]))
 
 (defn parse-paragraph
   "Parse a 'paragraph' line of text into an equivalent hiccup expression."
-  ([p-line] (parse-paragraph p-line [:p]))
-  ([p-line elem]
+  ([p-line local-links] (parse-paragraph p-line local-links [:p]))
+  ([p-line local-links elem]
    (if (empty? p-line)
      elem
      (if (contains? #{\~ \* \_ \/} (first p-line))
@@ -261,20 +236,21 @@
                rc (count run)]
            (parse-paragraph
             (drop rc p-line)
+            local-links
             (cond
               (re-matches #"\[fn:.*\]" run) (conj elem (parse-footnote run))
               (re-matches #"\[\[https:.*\]\]" run) (conj elem (parse-link run))
-              (re-matches #"\[\[id:.*\]\[.*\]\]" run) (conj elem (parse-local-link run)))))
+              (re-matches #"\[\[id:.*\]\[.*\]\]" run) (conj elem (parse-local-link run local-links)))))
 
          (let [run (apply str (take-while #(not (contains? #{\~ \* \_ \/ \[} %)) p-line))
                rc (count run)]
-           (parse-paragraph (drop rc p-line) (conj elem run))))))))
+           (parse-paragraph (drop rc p-line) local-links (conj elem run))))))))
 
 (defn parse-ending-footnote
   "Parse a footnote at the end of the file of form \"[fn:n] footnote content\" into a footnote element"
-  [s]
+  [s local-links]
   (let [footnote-number (apply str (take-while #(not= \] %) (drop 4 s)))
-        footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) s))) 0 :span)]
+        footnote-element (assoc (parse-paragraph (drop 1 (drop-while #(not= \] %) s)) local-links) 0 :span)]
     [:div [:a {:href (str "#back_" footnote-number) :name (str "footnote_" footnote-number)} (str "^" footnote-number)] footnote-element]))
 
 (defn add-element-to-list
@@ -297,7 +273,7 @@
 
 (defn  parse-body
   "Parses the body of a org document into a vector containing hiccup forms."
-  [file-string]
+  [file-string local-links]
   (let
    [lines (->>
            (str/split file-string #"\n")
@@ -313,36 +289,36 @@
                   \# (if (= fw "#+begin_src")
                        (conj accm (begin-code-block line)) ;; Open a code block
                        (conj (pop accm) [:pre (last last-element)])) ;; Close a code block
-                  \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " ""))]]
+                  \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " "") local-links)]]
                        (if (= last-element-type :ul)
                          (conj (pop accm) (conj last-element line-element)) ;; Append to the list
                          (conj accm [:ul line-element]))) ;; Start a new list
                   \* (conj accm (parse-heading line))
                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
                        (conj accm (parse-image line))
-                       (conj accm (parse-ending-footnote line)))
+                       (conj accm (parse-ending-footnote line local-links)))
                   (cond
                     (and (= last-element-type :pre)
                          (= :open (second last-element))) (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
                     (re-matches #"^\ *-.*" line) (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
                                                    (conj
                                                     (pop accm)
-                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " ""))] indentation-level))) ;; Nested lists
+                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " "") local-links)] indentation-level))) ;; Nested lists
                     (empty? line) accm ;; We ignore empty lines here.
-                    :else  (conj accm (parse-paragraph line))))))
+                    :else  (conj accm (parse-paragraph line local-links))))))
 
             []
             lines)))
 
-(defn blog-page [{:keys [path title tags pubDate]}]
+(defn blog-page [local-links {:keys [path title tags pubDate]}]
   (vec (concat
         [:main
          [:h1 {:id (str/replace title #" " "_")} title]]
-        (parse-body (slurp path)))))
+        (parse-body (slurp path) local-links))))
 
-(defn create-blog-page [blog-info]
+(defn create-blog-page [blog-info local-links]
   (->> blog-info
-       blog-page
+       (blog-page local-links)
        page-wrapper
        (spit (str "target/blogs/" (str/replace (:title blog-info) #" " "-") ".html"))))
 
@@ -359,35 +335,35 @@
 
 (defn generate-rss-feed
   "Generate an RSS feed from a collection of posts"
-  [blog-info]
- (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-  (h/html
-   {:mode :xml}
-   [:rss {:version "2.0"
-          :xmlns:atom "http://www.w3.org/2005/Atom"
-          :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
-    [:channel
-     [:title "Ryan Ellingson"]
-     [:description]
-     [:link "https://www.ryanellingson.blog"]
-     [:atom:link {:href "https://www.ryanellingson.blog/feed.xml"
-                  :rel "self"
-                  :type "application/rss+xml"}]
-     [:pubDate (-> blog-info first :pubDate)]
-     [:lastBuildDate  (current-rfc822-timestamp)]
-     [:language "en-US"]
+  [blog-info local-links]
+  (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+       (h/html
+        {:mode :xml}
+        [:rss {:version "2.0"
+               :xmlns:atom "http://www.w3.org/2005/Atom"
+               :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
+         [:channel
+          [:title "Ryan Ellingson"]
+          [:description]
+          [:link "https://www.ryanellingson.blog"]
+          [:atom:link {:href "https://www.ryanellingson.blog/feed.xml"
+                       :rel "self"
+                       :type "application/rss+xml"}]
+          [:pubDate (-> blog-info first :pubDate)]
+          [:lastBuildDate  (current-rfc822-timestamp)]
+          [:language "en-US"]
 
      ;; Generate an item for each post
-     (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
-       (let [link (get-blog-link-from-title title)]
-         [:item
-          [:title title]
-          [:link link]
-          [:description slug]
-          [:pubDate pubDate]
-          [:author "Ryan Ellingson"]
-          [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.blog" link)]
-          [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page blog-metadata)) "]]>" ))]]))]])))
+          (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
+            (let [link (get-blog-link-from-title title)]
+              [:item
+               [:title title]
+               [:link link]
+               [:description slug]
+               [:pubDate pubDate]
+               [:author "Ryan Ellingson"]
+               [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.blog" link)]
+               [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page local-links blog-metadata)) "]]>"))]]))]])))
 
 (defn build-site
   "entry point to build the site"
@@ -395,12 +371,10 @@
   (FileUtils/copyFileToDirectory
    (io/file "resources/styles.css")
    (io/file "target"))
-  (let [blog-info (get-blog-metadata)]
-    (doseq [{:keys [id title pubDate]} blog-info]
-      (when (not (get-publish-record-by-id id))
-        (add-publish-record id title "blogs" pubDate)))
+  (let [blog-info (get-blog-metadata)
+        local-links (map #(hash-map :id (:id %) :link (get-blog-link-from-title (:title %))) blog-info)]
     (->> (home-page blog-info)
          page-wrapper
          (spit "target/index.html"))
-    (doall (map create-blog-page (get-blog-metadata)))
-    (spit "target/feed.xml" (generate-rss-feed blog-info))))
+    (doall (map #(create-blog-page % local-links) blog-info))
+    (spit "target/feed.xml" (generate-rss-feed blog-info local-links))))
