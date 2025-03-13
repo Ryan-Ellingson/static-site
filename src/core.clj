@@ -215,6 +215,7 @@
 
 (defn parse-paragraph
   "Parse a 'paragraph' line of text into an equivalent hiccup expression."
+  ([p-line] (parse-paragraph p-line '() [:p]))
   ([p-line local-links] (parse-paragraph p-line local-links [:p]))
   ([p-line local-links elem]
    (if (empty? p-line)
@@ -225,7 +226,7 @@
              rc (+ (count run) 2)
              fc (first p-line)
              new-p-line (drop rc p-line)]
-         (parse-paragraph new-p-line (conj elem
+         (parse-paragraph new-p-line '() (conj elem
                                            (case fc
                                              \*  [:b run] ;; bold
                                              \~  [:code run] ;; code
@@ -273,42 +274,43 @@
 
 (defn  parse-body
   "Parses the body of a org document into a vector containing hiccup forms."
-  [file-string local-links]
-  (let
-   [lines (->>
-           (str/split file-string #"\n")
-           (drop-while #(not= % ":END:"))
-           rest
-           (drop-while #(re-matches #"#.*" %)))]
-    (reduce (fn [accm line]
-              (let [fc (first line)
-                    fw (first (str/split line #" "))
-                    last-element (last accm)
-                    last-element-type (first last-element)]
-                (case fc
-                  \# (if (= fw "#+begin_src")
-                       (conj accm (begin-code-block line)) ;; Open a code block
-                       (conj (pop accm) [:pre (last last-element)])) ;; Close a code block
-                  \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " "") local-links)]]
-                       (if (= last-element-type :ul)
-                         (conj (pop accm) (conj last-element line-element)) ;; Append to the list
-                         (conj accm [:ul line-element]))) ;; Start a new list
-                  \* (conj accm (parse-heading line))
-                  \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
-                       (conj accm (parse-image line))
-                       (conj accm (parse-ending-footnote line local-links)))
-                  (cond
-                    (and (= last-element-type :pre)
-                         (= :open (second last-element))) (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
-                    (re-matches #"^\ *-.*" line) (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
-                                                   (conj
-                                                    (pop accm)
-                                                    (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " "") local-links)] indentation-level))) ;; Nested lists
-                    (empty? line) accm ;; We ignore empty lines here.
-                    :else  (conj accm (parse-paragraph line local-links))))))
+  ([file-string] (parse-body file-string {}))
+  ([file-string local-links]
+   (let
+    [lines (->>
+            (str/split file-string #"\n")
+            (drop-while #(not= % ":END:"))
+            rest
+            (drop-while #(re-matches #"#.*" %)))]
+     (reduce (fn [accm line]
+               (let [fc (first line)
+                     fw (first (str/split line #" "))
+                     last-element (last accm)
+                     last-element-type (first last-element)]
+                 (case fc
+                   \# (if (= fw "#+begin_src")
+                        (conj accm (begin-code-block line)) ;; Open a code block
+                        (conj (pop accm) [:pre (last last-element)])) ;; Close a code block
+                   \- (let [line-element [:li (parse-paragraph (str/replace line #"^- " "") local-links)]]
+                        (if (= last-element-type :ul)
+                          (conj (pop accm) (conj last-element line-element)) ;; Append to the list
+                          (conj accm [:ul line-element]))) ;; Start a new list
+                   \* (conj accm (parse-heading line))
+                   \[ (if  (re-matches #"\[\[file:(.*)\]\]" line)
+                        (conj accm (parse-image line))
+                        (conj accm (parse-ending-footnote line local-links)))
+                   (cond
+                     (and (= last-element-type :pre)
+                          (= :open (second last-element))) (conj (pop accm) [:pre :open (conj (last last-element) (str line \newline))])
+                     (re-matches #"^\ *-.*" line) (let [indentation-level  (/ (count (take-while #(= \space %) line)) 2)]
+                                                    (conj
+                                                     (pop accm)
+                                                     (add-element-to-list  (last accm) [:li (parse-paragraph (str/replace line #"\ *- " "") local-links)] indentation-level))) ;; Nested lists
+                     (empty? line) accm ;; We ignore empty lines here.
+                     :else  (conj accm (parse-paragraph line local-links))))))
 
-            []
-            lines)))
+             []
+             lines))))
 
 (defn blog-page [local-links {:keys [path title tags pubDate]}]
   (vec (concat
