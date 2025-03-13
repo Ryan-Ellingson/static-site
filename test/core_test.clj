@@ -41,7 +41,7 @@
          [:p "Ignore " [:code "/target"] " the backslash in the code block"])
         "Didn't ignore backslash in code block.")
   (t/is (=
-         (c/parse-paragraph "we're going to be [[id:6545bad5-06a5-413f-b472-a5f7d6a18291][Tracking Goals with Clojure and Sqlite]]")
+         (c/parse-paragraph "we're going to be [[id:6545bad5-06a5-413f-b472-a5f7d6a18291][Tracking Goals with Clojure and Sqlite]]" `({:id "6545bad5-06a5-413f-b472-a5f7d6a18291" :link "/blogs/Tracking-Goals-with-Clojure-and-Sqlite"}))
          [:p "we're going to be " [:a {:href "/blogs/Tracking-Goals-with-Clojure-and-Sqlite"} "Tracking Goals with Clojure and Sqlite"]])
         "Didn't parse local link correctly"))
 
