@@ -266,6 +266,7 @@
      (add-element-to-list (last elem)
                           li (if (= :ul (first elem)) (dec level) level))))) ;; Only decrement if we're descending into a sub-list
 
+
 (defn begin-code-block
   "Parse a language from a 'begin_src' line and starts a code block with it"
   [s]
@@ -347,8 +348,8 @@
          [:channel
           [:title "Ryan Ellingson"]
           [:description]
-          [:link "https://www.ryanellingson.blog"]
-          [:atom:link {:href "https://www.ryanellingson.blog/feed.xml"
+          [:link "https://www.ryanellingson.dev"]
+          [:atom:link {:href "https://www.ryanellingson.dev/feed.xml"
                        :rel "self"
                        :type "application/rss+xml"}]
           [:pubDate (-> blog-info first :pubDate)]
@@ -364,7 +365,7 @@
                [:description slug]
                [:pubDate pubDate]
                [:author "Ryan Ellingson"]
-               [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.blog" link)]
+               [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.dev" link)]
                [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page local-links blog-metadata)) "]]>"))]]))]])))
 
 (defn build-site
@@ -380,3 +381,5 @@
          (spit "target/index.html"))
     (doall (map #(create-blog-page % local-links) blog-info))
     (spit "target/feed.xml" (generate-rss-feed blog-info local-links))))
+
+(build-site)
