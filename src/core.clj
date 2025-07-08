@@ -147,8 +147,17 @@
                     (re-matches #"\-" first-token) (if (= last-element-type :ul)
                                                      (conj (pop accm) (conj last-element line))
                                                      (conj accm  [:ul line]))
-                    ;; Files
-                    (re-matches #"\[\[file:.*\]\]" first-token) (conj accm (str "image file link 🖼"))
+                    ;; Images
+                    (re-matches #"\[\[file:.*\]\]" first-token) (conj accm (let [image-file
+                                                                                 (io/file
+                                                                                  (str/replace-first
+                                                                                   (second (re-matches #"\[\[file:(.*)\]\]" line))
+                                                                                   #"~" (System/getProperty "user.home")))
+                                                                                 new-filepath (str "/images/" (.getName image-file))]
+                                                                             (FileUtils/copyFileToDirectory
+                                                                              image-file
+                                                                              (io/file "target/images/"))
+                                                                             [:img {:src new-filepath}]))
                     ;; Code in a code block
                     (and (= :pre last-element-type) (= :open (second last-element))) (conj (pop accm) (conj (pop last-element) (conj (last last-element) (str line \newline))))
                     ;; Paragraph
@@ -168,7 +177,6 @@
       (concat [:div])
       vec))])
 
-;;(blog-page {:title "foo" :path "/home/ray/org/roam/20241202021718-build_your_own_damn_static_site_generator.org"})
 
 (defn create-blog-page [blog-metadata]
   (->> blog-metadata
