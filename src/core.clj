@@ -173,6 +173,79 @@
                 [:ul]
                 (rest elem))
                elem)))
+      (map (fn [elem]
+             (if (= (first elem) :p)
+               (loop [coll [:p]
+                      p-text (second elem)
+                      l-char nil
+                      f-char nil]
+                 (if (empty? p-text)
+                   (if f-char
+                     (conj (conj
+                            (pop coll)
+                            (assoc
+                             (last coll) 1
+                             (apply str (butlast (last (last coll))))))
+                           (str (first p-text)))
+                     coll)
+
+                   (cond
+                     ;; Beginning a formatting sequence
+                     (and (or (#{\. \, \- \( \space} l-char) (nil? l-char))
+                          (#{\/ \~ \- \* \_} (first p-text))
+                          (nil? f-char)
+                          (rest p-text)
+                          (re-find (re-pattern
+                                    (str \( \\ (first p-text) \$ \|
+                                         \\ (first p-text) "\\." \|
+                                         \\ (first p-text) \, \|
+                                         \\ (first p-text) "\\)" \|
+                                         \\ (first p-text) \- \|
+                                         \\ (first p-text) \space \))) (apply str (rest p-text))))
+                     (recur
+                      (conj coll [(case (first p-text) \/ :i \~ :code \- :s \* :b \_ :u) ""])
+                      (rest p-text)
+                      (first p-text)
+                      (first p-text))
+                     ;; Ending a formatting sequence
+                     (and f-char
+                          (= l-char f-char)
+                          (or
+                           ;; Followed by a space
+                           (= (first p-text) \space)
+                           ;; It's the end of the paragraph
+                           (empty? (rest p-text))
+                           ;; We see an ending character followed by a space or end
+                           (and
+                            (#{\. \, \- \)} (first p-text))
+                            (or (empty? (rest p-text)) (#{\space \. \, \-}(second p-text))))))
+                     (recur
+                      (conj (conj
+                             (pop coll)
+                             (assoc
+                              (last coll) 1
+                              (apply str (butlast (last (last coll))))))
+                            (str (first p-text)))
+                      (rest p-text)
+                      (first p-text)
+                      nil)
+                     ;; adding to an existing formatted element
+                     f-char
+                     (recur
+                      (conj (pop coll) (assoc (last coll) 1 (str (last (last coll)) (first p-text))))
+                      (rest p-text)
+                      (first p-text)
+                      f-char)
+                     :else
+                     (recur
+                      (if (string? (last coll))
+                        (conj (pop coll) (str (last coll) (first p-text)))
+                        (conj coll (str (first p-text))))
+                      (rest p-text)
+                      (first p-text)
+                      f-char))))
+
+               elem)))
 
       (concat [:div])
       vec))])
