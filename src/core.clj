@@ -160,7 +160,7 @@
           coll)
 
         (cond
-                       ;; Beginning a formatting sequence
+          ;; Beginning a formatting sequence
           (and (f-chars next-char)
                (or (prefix-chars l-char) (nil? l-char))
                (nil? f-char)
@@ -174,7 +174,7 @@
                               \\ next-char \space \))) (apply str text-left)))
           (recur
            (conj coll [(case next-char \/ :i \~ :code \- :s \* :b \_ :u) ""]) text-left next-char next-char)
-                        ;; Ending a formatting sequence
+          ;; Ending a formatting sequence
           (and f-char
                (= l-char f-char)
                (or
@@ -194,7 +194,7 @@
           f-char
           (recur
            (conj (pop coll) (assoc (last coll) 1 (str (last (last coll)) next-char))) text-left next-char f-char)
-                       ;; parse-link
+          ;; parse-link
           (= next-char \[)
           (let
            [run (parse-bracket p-text)
@@ -237,6 +237,14 @@
                                  (add-element-to-list-in-order (last last-li) li (dec level))))
          ;; sub-list does not exist, create it and add the item as the first element
          (conj (pop elem) (conj last-li [:ul li])))))))
+
+(defn current-rfc822-timestamp
+  "Generate current timestamp in RFC 822/2822 format."
+  []
+  (.format (ZonedDateTime/now ZoneOffset/UTC)
+           (DateTimeFormatter/ofPattern
+            "EEE, dd MMM yyyy HH:mm:ss Z"
+            Locale/US)))
 
 (defn blog-page [blog-metadata]
   [:main
@@ -301,10 +309,42 @@
                (parse-paragraph (second elem))
                elem)))
       vec
+      (#(conj % [:h1 "Footnotes"]))
       (#(conj % (vec (concat [:div] (map parse-ending-footnote footnotes)))))
       (concat [:div])
-      vec
-      ))])
+      vec))])
+
+(defn generate-rss-feed
+  "Generate an RSS feed from a collection of posts"
+  [blog-info]
+  (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+       (h/html
+        {:mode :xml}
+        [:rss {:version "2.0"
+               :xmlns:atom "http://www.w3.org/2005/Atom"
+               :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
+         [:channel
+          [:title "Ryan Ellingson"]
+          [:description]
+          [:link "https://www.ryanellingson.dev"]
+          [:atom:link {:href "https://www.ryanellingson.dev/feed.xml"
+                       :rel "self"
+                       :type "application/rss+xml"}]
+          [:pubDate (-> blog-info first :pubDate)]
+          [:lastBuildDate  (current-rfc822-timestamp)]
+          [:language "en-US"]
+
+     ;; Generate an item for each post
+          (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
+            (let [link (str "/blogs/" (str/replace title #" " "-"))]
+              [:item
+               [:title title]
+               [:link link]
+               [:description slug]
+               [:pubDate pubDate]
+               [:author "Ryan Ellingson"]
+               [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.dev" link)]
+               [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page blog-metadata)) "]]>"))]]))]])))
 
 (defn create-blog-page [blog-metadata]
   (->> blog-metadata
@@ -325,53 +365,7 @@
       (->> (home-page blog-metadata)
            page-wrapper
            (spit "target/index.html"))
-      (doall (map #(create-blog-page %) blog-metadata)))))
+      (doall (map #(create-blog-page %) blog-metadata))
+      (spit "target/feed.xml" (generate-rss-feed blog-metadata)))))
 
 (build-site)
-
-
-;; (defn generate-rss-feed
-;;   "Generate an RSS feed from a collection of posts"
-;;   [blog-info local-links]
-;;   (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-;;        (h/html
-;;         {:mode :xml}
-;;         [:rss {:version "2.0"
-;;                :xmlns:atom "http://www.w3.org/2005/Atom"
-;;                :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
-;;          [:channel
-;;           [:title "Ryan Ellingson"]
-;;           [:description]
-;;           [:link "https://www.ryanellingson.dev"]
-;;           [:atom:link {:href "https://www.ryanellingson.dev/feed.xml"
-;;                        :rel "self"
-;;                        :type "application/rss+xml"}]
-;;           [:pubDate (-> blog-info first :pubDate)]
-;;           [:lastBuildDate  (current-rfc822-timestamp)]
-;;           [:language "en-US"]
-
-;;      ;; Generate an item for each post
-;;           (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
-;;             (let [link (get-blog-link-from-title title)]
-;;               [:item
-;;                [:title title]
-;;                [:link link]
-;;                [:description slug]
-;;                [:pubDate pubDate]
-;;                [:author "Ryan Ellingson"]
-;;                [:guid {:isPermaLink "true"} (str "https://www.ryanellingson.dev" link)]
-;;                [:content:encoded (raw-string (str "<![CDATA["  (h/html (blog-page local-links blog-metadata)) "]]>"))]]))]])))
-
-;; (defn build-site
-;;   "entry point to build the site"
-;;   []
-;;   (FileUtils/copyFileToDirectory
-;;    (io/file "resources/styles.css")
-;;    (io/file "target"))
-;;   (let [blog-info (get-blog-metadata)
-;;         local-links (map #(hash-map :id (:id %) :link (get-blog-link-from-title (:title %))) blog-info)]
-;;     (->> (home-page blog-info)
-;;          page-wrapper
-;;          (spit "target/index.html"))
-;;     (doall (map #(create-blog-page % local-links) blog-info))
-;;     (spit "target/feed.xml" (generate-rss-feed blog-info local-links))))
