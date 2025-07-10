@@ -266,17 +266,27 @@
                       last-element (last accm)
                       last-element-type (if (vector? last-element) (first last-element) nil)]
                   (cond
+                    ;; Start of quote block
+                    (re-matches #"\#\+begin_quote" first-token) (conj accm
+                                                                      [:blockquote :open ""])
+                    ;; end of quote block
+                    (re-matches #"\#\+end_quote" first-token)
+                    (conj (pop accm) (vec (concat [:blockquote] (drop 2 last-element))))
+
                     ;; Start of a code block
                     (re-matches #"\#\+begin_src" first-token) (conj accm (let [lang (second (re-matches #"\#\+begin_src\ (\w*).*" line))]
                                                                            [:pre :open [:code {:class lang}]]))
                     ;; End of a code block
-                    (re-matches #"\#\+end_src" first-token) (conj (pop accm) [:pre (last last-element)]) ;; remove the :open tag
+                    (re-matches #"\#\+end_src" first-token)
+                    (conj (pop accm) [:pre (last last-element)]) ;; remove the :open tag
                     ;; Headings
-                    (re-matches #"\*+" first-token) (conj accm [(keyword (str "h" (count first-token))) (str/trim (apply str (drop-while #(= \* %) line)))])
+                    (re-matches #"\*+" first-token)
+                    (conj accm [(keyword (str "h" (count first-token))) (str/trim (apply str (drop-while #(= \* %) line)))])
                     ;; Lists
-                    (re-matches #"\-" first-token) (if (= last-element-type :ul)
-                                                     (conj (pop accm) (conj last-element line))
-                                                     (conj accm  [:ul line]))
+                    (and (re-matches #"\-" first-token) (not= last-element-type :blockquote))
+                    (if (= last-element-type :ul)
+                      (conj (pop accm) (conj last-element line))
+                      (conj accm  [:ul line]))
                     ;; Images
                     (re-matches #"\[\[file:.*\]\]" first-token) (conj accm (let [image-file
                                                                                  (io/file
@@ -290,6 +300,10 @@
                                                                              [:img {:src new-filepath}]))
                     ;; Code in a code block
                     (and (= :pre last-element-type) (= :open (second last-element))) (conj (pop accm) (conj (pop last-element) (conj (last last-element) (str line \newline))))
+                    ;; Line in a quote block
+                    (and (= :blockquote last-element-type) (= :open (second last-element))) (if (= first-token "-")
+                                                                                              (conj (pop accm) (conj last-element (vec (concat [:footer] (drop 1 (parse-paragraph line))))))
+                                                                                              (conj (pop accm) (conj last-element (parse-paragraph line))))
                     ;; Paragraph
                     :else (conj accm [:p line]))))
 
