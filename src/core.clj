@@ -22,7 +22,7 @@
                     :content "Personal blog of Ryan Ellingson."}]
             [:link {:rel "alternate"
                     :type "application/rss+xml"
-                    :href "/rss.xml"}]
+                    :href "/feed.xml"}]
             [:title "Ryan's Blog"]
             [:link {:rel "icon" :type "image/png" :sizes "96x96" :href "/favicon-96x96.png"}]
             [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
