@@ -228,7 +228,10 @@
 (defn add-element-to-list-in-order
   "Adds an item to the end of a ul element at the specified level."
   ([elem line]
-   (add-element-to-list-in-order elem [:li (parse-paragraph (str/replace line #"^\ *- " ""))] (/ (count (take-while #(= \space %) line)) 2)))
+   (let
+    [space-prefix  (count (take-while #(= \space %) line))]
+     (assert (= (mod space-prefix 2) 0) (str "Space prefix for " line " Is not even"))
+     (add-element-to-list-in-order elem [:li (parse-paragraph (str/replace line #"^\ *- " ""))] (/ space-prefix 2))))
   ([elem li level]
    (assert (= (first elem) :ul) (str "Tried to add list item" li "to non-list element: " elem))
    (if (= level 0)
