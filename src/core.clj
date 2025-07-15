@@ -154,21 +154,14 @@
           b-chars  #{\. \, \- \) \space}
           prefix-chars #{\. \, \- \( \space}]
       (if (empty? p-text)
-        (if f-char
-          (conj (conj
-                 (pop coll)
-                 (assoc
-                  (last coll) 1
-                  (apply str (butlast (last (last coll))))))
-                (str next-char))
-          coll)
-
+        coll
         (cond
           ;; Beginning a formatting sequence
           (and (f-chars next-char)
                (or (prefix-chars l-char) (nil? l-char))
                (nil? f-char)
                text-left
+               ;; Don't begin a formatting sequence that doesn't end
                (re-find (re-pattern
                          (str \( \\ next-char \$ \|
                               \\ next-char "\\." \|
