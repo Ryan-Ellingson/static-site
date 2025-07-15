@@ -170,7 +170,10 @@
                               \\ next-char \- \|
                               \\ next-char \space \))) (apply str text-left)))
           (recur
-           (conj coll [(case next-char \/ :i \~ :code \- :s \* :b \_ :u) ""]) text-left next-char next-char)
+           (conj coll [(case next-char \/ :i \~ :code \- :s \* :b \_ :u) ""])
+           text-left
+           next-char
+           next-char)
           ;; Ending a formatting sequence
           (and f-char
                (= l-char f-char)
@@ -180,6 +183,7 @@
                 (and
                  (b-chars next-char)
                  (or (empty? text-left) (b-chars (second p-text))))))
+
           (recur
            (conj (conj
                   (pop coll)
@@ -187,10 +191,13 @@
                    (last coll) 1
                    (apply str (butlast (last (last coll))))))
                  (str next-char)) text-left next-char nil)
-                       ;; adding to an existing formatted element
+          ;; adding to an existing formatted element
           f-char
           (recur
-           (conj (pop coll) (assoc (last coll) 1 (str (last (last coll)) next-char))) text-left next-char f-char)
+           (conj (pop coll) (assoc (last coll) 1 (str (last (last coll)) next-char)))
+           text-left
+           next-char
+           f-char)
           ;; parse-link
           (= next-char \[)
           (let
@@ -227,13 +234,13 @@
    (if (= level 0)
      ;; If we're at the correct indentation level, add the item to the list
      (conj elem li)
-     (let [last-li (last elem)]
-       (if (= (first (last last-li)) :ul)
+     (let [last-elem (last elem)]
+       (if (= (first (last last-elem)) :ul)
          ;; list exists at the indentation level Descend into it
-         (conj (pop elem) (assoc last-li 2
-                                 (add-element-to-list-in-order (last last-li) li (dec level))))
+         (conj (pop elem) (assoc last-elem 2
+                                 (add-element-to-list-in-order (last last-elem) li (dec level))))
          ;; sub-list does not exist, create it and add the item as the first element
-         (conj (pop elem) (conj last-li [:ul li])))))))
+         (conj (pop elem) (conj last-elem [:ul li])))))))
 
 (defn current-rfc822-timestamp
   "Generate current timestamp in RFC 822/2822 format."
@@ -296,11 +303,15 @@
                                                                               (io/file "target/images/"))
                                                                              [:img {:src new-filepath}]))
                     ;; Code in a code block
-                    (and (= :pre last-element-type) (= :open (second last-element))) (conj (pop accm) (conj (pop last-element) (conj (last last-element) (str line \newline))))
+                    (and
+                     (= :pre last-element-type)
+                     (= :open (second last-element))) (conj (pop accm) (conj (pop last-element) (conj (last last-element) (str line \newline))))
                     ;; Line in a quote block
-                    (and (= :blockquote last-element-type) (= :open (second last-element))) (if (= first-token "-")
-                                                                                              (conj (pop accm) (conj last-element (vec (concat [:footer] (drop 1 (parse-paragraph line))))))
-                                                                                              (conj (pop accm) (conj last-element (parse-paragraph line))))
+                    (and
+                     (= :blockquote last-element-type)
+                     (= :open (second last-element))) (if (= first-token "-")
+                                                        (conj (pop accm) (conj last-element (vec (concat [:footer] (drop 1 (parse-paragraph (str/replace line #"^- " " ")))))))
+                                                        (conj (pop accm) (conj last-element (parse-paragraph line))))
                     ;; Paragraph
                     :else (conj accm [:p line]))))
 
