@@ -45,8 +45,6 @@
                           ["/feed.xml" "rss"]]))]]
            [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
-(def ^:dynamic *local-links* nil)
-
 (defn rfc->dmy
   "Convert an RFC 822/2822 date string to a dd-MM-yyyy format"
   [rfc-date]
@@ -54,13 +52,13 @@
       (.format (DateTimeFormatter/ofPattern "dd-MM-yyyy"))))
 
 (defn get-org-file-metadata
-  "Given a path to an org file, parse the properties and tags"
+  "Given a path to an org file, parse it's properties into a map"
   [org-file-path]
   (let [f (io/file org-file-path)]
     (assert (.exists f) (str "org file doesn't exist " f))
     (with-open
      [r (io/reader f :encoding "ISO-8859-1")]
-      (let [top-block (take-while #(not (= % \n)) (line-seq r))]
+      (let [top-block (take-while #(not (= % \newline)) (line-seq r))]
         (letfn [(get-line-value [s pattern]
                   (->> s
                        (map #(re-find pattern %))
@@ -80,9 +78,7 @@
                         (rfc->dmy d)))
            :path org-file-path})))))
 
-(defn get-blogs-from-roam
-  "Get all the blog files marked with the PYD tag"
-  []
+(def blogs-metadata
   (->> (.listFiles
         (io/file
          (str (System/getProperty "user.home") "/org/roam")))
@@ -90,6 +86,13 @@
        (filter #(re-matches #".*\.org$" %))
        (map get-org-file-metadata)
        (filter #(some #{"PYD"} (:tags %)))))
+
+(def local-links
+  (map
+   #(hash-map
+     :roam-uid (:roam-uid %)
+     :link (str "/blogs/" (str/replace (:title %) #" " "-")))
+   blogs-metadata))
 
 (defn home-page [blog-info]
   [:main {:class "home-page"}
@@ -136,7 +139,8 @@
   [s]
   (let
    [[_ id remark]  (re-find #"\[\[id\:(.*)\]\[(.*)\]\]" s)
-    link (:link (first (filter #(= id (:id %)) *local-links*)))]
+    link (:link (first (filter #(= id (:roam-uid %)) local-links)))]
+    (assert link (str "tried to link to roam page with remark: \"" remark "\" with id: \"" id "\" with no link entry!"))
     [:a {:href link} remark]))
 
 (defn parse-paragraph
@@ -374,12 +378,10 @@
    (io/file "resources/styles.css")
    (io/file "target"))
   ;; parse all blog files
-  (let [blog-metadata (get-blogs-from-roam)]
-    (binding [*local-links* (map #(hash-map :id (:id %) :link (str "/blogs/" (str/replace (:title %) #" " "-"))) blog-metadata)]
-      (->> (home-page blog-metadata)
-           page-wrapper
-           (spit "target/index.html"))
-      (doall (map #(create-blog-page %) blog-metadata))
-      (spit "target/feed.xml" (generate-rss-feed blog-metadata)))))
+    (->> (home-page blogs-metadata)
+         page-wrapper
+         (spit "target/index.html"))
+    (doall (map #(create-blog-page %) blogs-metadata))
+    (spit "target/feed.xml" (generate-rss-feed blogs-metadata)))
 
 (build-site)
