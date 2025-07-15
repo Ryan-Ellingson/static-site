@@ -347,7 +347,7 @@
                :xmlns:content "http://purl.org/rss/1.0/modules/content/"}
          [:channel
           [:title "Ryan Ellingson"]
-          [:description]
+          [:description "Personal blog of Ryan Ellingson."]
           [:link "https://www.ryanellingson.dev"]
           [:atom:link {:href "https://www.ryanellingson.dev/feed.xml"
                        :rel "self"
@@ -358,7 +358,7 @@
 
      ;; Generate an item for each post
           (for [{:keys [title slug pubDate] :as blog-metadata} (take 20 blog-info)]
-            (let [link (str "/blogs/" (str/replace title #" " "-"))]
+            (let [link (str "https://www.ryanellingson.dev/blogs/" (str/replace title #" " "-"))]
               [:item
                [:title title]
                [:link link]
