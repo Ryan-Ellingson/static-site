@@ -1,5 +1,5 @@
 #+title: Roam Static Site
-Static-Site Generator to turn files in an Org-Roam database into a Website using an ad-hoc ~.org~ file parser.
+Static-Site Generator to turn files in an Org-Roam database into a Website using an ad-hoc ~.org~ file parser. Used to create ryanellingson.dev.
 
 * Build and Run The Site Locally
 ** Prerequisite
