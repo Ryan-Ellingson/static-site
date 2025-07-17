@@ -12,20 +12,35 @@
 
 (defn page-wrapper
   "Wraps content so the site's consistent."
-  [page & other]
+  [page & {:keys [blog-metadata]
+           :or {blog-metadata nil}}]
   (h/html [:html
-           [:head
-            [:meta {:charset "UTF-8"}]
-            [:meta {:name "viewport"
-                    :content "width=device-width, initial-scale=1"}]
-            [:meta {:name "description"
-                    :content "Personal blog of Ryan Ellingson."}]
-            [:link {:rel "alternate"
-                    :type "application/rss+xml"
-                    :href "/feed.xml"}]
-            [:title "Ryan's Blog"]
-            [:link {:rel "icon" :type "image/png" :sizes "96x96" :href "/favicon-96x96.png"}]
-            [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
+           (vec (concat
+            [:head
+             [:meta {:charset "UTF-8"}]
+             [:meta {:name "viewport"
+                     :content "width=device-width, initial-scale=1"}]
+             [:meta {:name "description"
+                     :content "Personal blog of Ryan Ellingson."}]
+             [:link {:rel "alternate"
+                     :type "application/rss+xml"
+                     :href "/feed.xml"}]
+             [:title "Ryan's Blog"]
+             [:link {:rel "icon" :type "image/png" :sizes "96x96" :href "/images/turtle.webp"}]
+             [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
+            (if blog-metadata
+              [[:meta {:property "og:title" :content (:title blog-metadata)}]
+               [:meta {:property "og:description" :content (:slug blog-metadata)}]
+               [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
+               [:meta {:property "og:url" :content (str "https://ryanellingson.dev" "/blogs/" (str/replace (:title blog-metadata) #" " "-"))}]
+               [:meta {:property "og:type" :content "website"}]
+               [:meta {:property "og:site_name" :content "Ryan's Blog"}]]
+              [[:meta {:property "og:title" :content "Ryan's Blog"}]
+               [:meta {:property "og:description" :content "Personal Blog of Ryan Ellingson"}]
+               [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
+               [:meta {:property "og:url" :content "https://ryanellingson.dev"}]
+               [:meta {:property "og:type" :content "website"}]
+               [:meta {:property "og:site_name" :content "Ryan's Blog"}]])))
            ;;Highlight.JS
            ;;Add code highlighting to code blocks
            [:link {:href "https://unpkg.com/highlightjs@9.16.2/styles/gruvbox-dark.css" :rel "stylesheet" :type "text/css"}]
@@ -40,10 +55,10 @@
              (into [:ul {:class "menu-bar"}]
                    (mapv (fn [[link label]]
                            [:a {:href link}  [:li  label]])
-                         [["/" "home"]
-                          ["https://github.com/Ryan-Ellingson" "github"]
+                         [["/" "Home"]
+                          ["https://github.com/Ryan-Ellingson" "Git"]
                           ["/feed.xml" "rss"]]))]]
-           [:body page other [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
+           [:body page [:div {:class "watermark-image"} [:img {:src "/images/turtle.webp"}]]]]))
 
 (defn rfc->dmy
   "Convert an RFC 822/2822 date string to a dd-MM-yyyy format"
@@ -374,7 +389,7 @@
 (defn create-blog-page [blog-metadata]
   (->> blog-metadata
        blog-page
-       page-wrapper
+       (#(page-wrapper % :blog-metadata blog-metadata))
        (spit (str "target/blogs/" (str/replace (:title blog-metadata) #" " "-") ".html"))))
 
 (defn build-site
@@ -384,11 +399,12 @@
   (FileUtils/copyFileToDirectory
    (io/file "resources/styles.css")
    (io/file "target"))
-  ;; parse all blog files
-    (->> (home-page blogs-metadata)
-         page-wrapper
-         (spit "target/index.html"))
-    (doall (map #(create-blog-page %) blogs-metadata))
-    (spit "target/feed.xml" (generate-rss-feed blogs-metadata)))
+  ;; Create home page
+  (->> (home-page blogs-metadata)
+       page-wrapper
+       (spit "target/index.html"))
+  ;; Create blog pages
+  (doall (map #(create-blog-page %) blogs-metadata))
+  (spit "target/feed.xml" (generate-rss-feed blogs-metadata)))
 
 (build-site)
