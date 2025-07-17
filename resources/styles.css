@@ -148,6 +148,12 @@ li p {
   opacity: 0.5;
 }
 
+@media (max-width: 750px){
+    .watermark-image img {
+	max-width: 50px;
+    }
+}
+
 .home-page h1 {
     text-align: center;
 }
