@@ -1,8 +1,7 @@
-#+title: Static Site
-
+#+title: Roam Static Site
+Static-Site Generator to turn files in an Org-Roam database into a Website using an ad-hoc ~.org~ file parser.
 
 * Build and Run The Site Locally
-I like to have a local Nginx server that I can check the site against so there are no surprises when I deploy things. Also a good sanity check for any server configuration changes that need to be tested.
 ** Prerequisite
 - Clojure CLJ Tool
 - Docker
@@ -11,14 +10,10 @@ I like to have a local Nginx server that I can check the site against so there a
 docker run --name static-site-custom -p 80:80 -d  -v "$(pwd)/target:/var/www/html:ro"  -v "$(pwd)/default.conf:/etc/nginx/conf.d/default.conf:ro" nginx
 #+end_src
 
-
 Alternatively, if the container already exists, just start it.
 #+begin_src sh
 docker start static-site-custom
 #+end_src
-
-#+RESULTS:
-: static-site-custom
 
 ** Build The Site
 #+begin_src shell :results verbatim
@@ -31,21 +26,11 @@ clj -X:test
 #+end_src
 
 ** Teardown
-*** Stop the Server Container
+*** Stop and remove the Server Container
 #+begin_src shell :results verbatim
 docker stop static-site-custom
-#+end_src
-
-#+RESULTS:
-: static-site-custom
-
-*** Remove the Server Container
-#+begin_src shell :results verbatim
 docker remove static-site-custom
 #+end_src
-
-#+RESULTS:
-: static-site-custom
 
 *** Clean
 #+begin_src shell :results verbatim
