@@ -3,7 +3,8 @@
    [hiccup2.core :as h]
    [hiccup.util :refer [raw-string]]
    [clojure.string :as str]
-   [clojure.java.io :as io])
+   [clojure.java.io :as io]
+   [clojure.data.json :as json])
 
   (:import org.apache.commons.io.FileUtils
            [java.time.format DateTimeFormatter]
@@ -16,31 +17,37 @@
            :or {blog-metadata nil}}]
   (h/html [:html
            (vec (concat
-            [:head
-             [:meta {:charset "UTF-8"}]
-             [:meta {:name "viewport"
-                     :content "width=device-width, initial-scale=1"}]
-             [:meta {:name "description"
-                     :content "Personal blog of Ryan Ellingson."}]
-             [:link {:rel "alternate"
-                     :type "application/rss+xml"
-                     :href "/feed.xml"}]
-             [:title "Ryan's Blog"]
-             [:link {:rel "icon" :type "image/png" :sizes "96x96" :href "/images/turtle.webp"}]
-             [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
-            (if blog-metadata
-              [[:meta {:property "og:title" :content (:title blog-metadata)}]
-               [:meta {:property "og:description" :content (:slug blog-metadata)}]
-               [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
-               [:meta {:property "og:url" :content (str "https://ryanellingson.dev" "/blogs/" (str/replace (:title blog-metadata) #" " "-"))}]
-               [:meta {:property "og:type" :content "website"}]
-               [:meta {:property "og:site_name" :content "Ryan's Blog"}]]
-              [[:meta {:property "og:title" :content "Ryan's Blog"}]
-               [:meta {:property "og:description" :content "Personal Blog of Ryan Ellingson"}]
-               [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
-               [:meta {:property "og:url" :content "https://ryanellingson.dev"}]
-               [:meta {:property "og:type" :content "website"}]
-               [:meta {:property "og:site_name" :content "Ryan's Blog"}]])))
+                 [:head
+                  [:meta {:charset "UTF-8"}]
+                  [:meta {:name "viewport"
+                          :content "width=device-width, initial-scale=1"}]
+                  [:meta {:name "description"
+                          :content "Personal blog of Ryan Ellingson."}]
+                  [:link {:rel "alternate"
+                          :type "application/rss+xml"
+                          :href "/feed.xml"}]
+                  [:link {:rel "preconnect"
+                          :href "https://fonts.googleapis.com"}]
+                  [:link {:rel "preconnect"
+                          :href "https://fonts.gstatic.com"}]
+                  [:link {:href "https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap"
+                          :rel "stylesheet"}]
+                  [:title "Ryan's Blog"]
+                  [:link {:rel "icon" :type "image/png" :sizes "96x96" :href "/images/turtle.webp"}]
+                  [:link {:href "/styles.css" :rel "stylesheet" :type "text/css"}]]
+                 (if blog-metadata
+                   [[:meta {:property "og:title" :content (:title blog-metadata)}]
+                    [:meta {:property "og:description" :content (:slug blog-metadata)}]
+                    [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
+                    [:meta {:property "og:url" :content (str "https://ryanellingson.dev" "/blogs/" (str/replace (:title blog-metadata) #" " "-"))}]
+                    [:meta {:property "og:type" :content "website"}]
+                    [:meta {:property "og:site_name" :content "Ryan's Blog"}]]
+                   [[:meta {:property "og:title" :content "Ryan's Blog"}]
+                    [:meta {:property "og:description" :content "Personal Blog of Ryan Ellingson"}]
+                    [:meta {:property "og:image" :content "https://ryanellingson.dev/images/turtle.webp"}]
+                    [:meta {:property "og:url" :content "https://ryanellingson.dev"}]
+                    [:meta {:property "og:type" :content "website"}]
+                    [:meta {:property "og:site_name" :content "Ryan's Blog"}]])))
            ;;Highlight.JS
            ;;Add code highlighting to code blocks
            [:link {:href "https://unpkg.com/highlightjs@9.16.2/styles/gruvbox-dark.css" :rel "stylesheet" :type "text/css"}]
@@ -392,6 +399,26 @@
        (#(page-wrapper % :blog-metadata blog-metadata))
        (spit (str "target/blogs/" (str/replace (:title blog-metadata) #" " "-") ".html"))))
 
+(defn load-cards [filename]
+  (with-open [reader (io/reader filename)]
+    (json/read reader :key-fn keyword)))
+
+(defn read-log
+  "Open the card acquisition log and parse it's contents into a map, assuming a card is only acquired once."
+  []
+  (let [f (io/file (str (System/getProperty "user.home") "/org/roam/scripts/ecl_log.log"))]
+    (with-open
+     [r (io/reader f :encoding "ISO-8859-1")]
+      (doall
+       (reduce
+        (fn [accm n]
+          (assoc accm (nth n 1) {:date (nth n 0) :acquisition-type (nth n 2)}))
+        {}
+        (map
+         (fn [log] (mapv str/trim log))
+         (map (fn [n] (str/split n #",")) (line-seq r))))))))
+
+
 (defn build-site
   "entry point to build the site"
   []
@@ -403,6 +430,40 @@
   (->> (home-page blogs-metadata)
        page-wrapper
        (spit "target/index.html"))
+  ;; Copy card image files
+  (doseq [file (.listFiles (io/file (str (System/getProperty "user.home") "/org/roam/pics/ecl_cards")))]
+    (when (.isFile file)
+      (FileUtils/copyFileToDirectory file (io/file "target/images/"))))
+  (let
+   [acquired-cards (read-log)]
+    (->> [:main
+          [:ul {:class "legend"} [:li [:span {:class "legend-square gold"}]] [:li "Purchased"]
+           [:li [:span {:class "legend-square blue"}]] [:li "Packs"]
+           [:li [:span {:class "legend-square red"}]] [:li "Limited Event"]
+           [:li [:span {:class "legend-square green"}]] [:li "Trade"]
+           [:li [:span {:class "legend-square purple"}]] [:li "Donation"]]
+          (into [:div {:class "card-grid"}] (map
+                                             (fn [n]
+                                               [:div {:class (if (get acquired-cards (:collector_number n)) "card" "card uncollected-card")}
+                                                [:img
+                                                 {:src (str "/images/" (:collector_number n) "_small.jpg")}]
+                                                [:span {:class
+                                                        (str "acquisition-square "
+                                                             (case (:acquisition-type (get acquired-cards (:collector_number n)))
+                                                               "purchased" "gold"
+                                                               "packs" "blue"
+                                                               "limited event" "red"
+                                                               "trade" "green"
+                                                               "donation" "purple"
+                                                               nil "none"
+                                                               :else "none"))}]
+
+                                                [:div {:class "collector-number"} (:collector_number n)]])
+                                             (load-cards
+                                              (str (System/getProperty "user.home") "/org/roam/scripts/ecl_cards.json"))))]
+         page-wrapper
+         (spit "target/collection.html")))
+
   ;; Create blog pages
   (doall (map #(create-blog-page %) blogs-metadata))
   (spit "target/feed.xml" (generate-rss-feed blogs-metadata)))
